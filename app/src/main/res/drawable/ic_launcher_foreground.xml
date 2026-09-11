@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Coin body with gold gradient -->
+    <path android:pathData="M54,20 A34,34 0 1,1 53.9,20 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="24"
+                android:startY="20"
+                android:endX="84"
+                android:endY="88">
+                <item android:offset="0" android:color="#FFE9C46A" />
+                <item android:offset="0.5" android:color="#FFD4A017" />
+                <item android:offset="1" android:color="#FFB8860B" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Inner ring -->
+    <path
+        android:pathData="M54,28 A26,26 0 1,1 53.9,28 Z"
+        android:strokeColor="#33FFFFFF"
+        android:strokeWidth="1.6"
+        android:fillColor="#00000000" />
+
+    <!-- Toman/rial style mark -->
+    <path
+        android:pathData="M40,44 h28 v7 h-10.5 v23 h-7 v-23 h-10.5 Z"
+        android:fillColor="#3B2A06" />
+
+    <!-- Small uptrend arrow accent -->
+    <path
+        android:pathData="M66,66 l10,-12 l5,5 l-14,16 l-9,-7 l-8,9 l-3,-3 l11,-13 Z"
+        android:fillColor="#2E7D32" />
+</vector>
