@@ -21,10 +21,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.glance.appwidget.updateAll
 import ir.pricewidget.app.R
 import ir.pricewidget.app.data.ApiService
 import ir.pricewidget.app.data.GoldCurrencyResponse
 import ir.pricewidget.app.data.PrefsRepository
+import ir.pricewidget.app.widget.PriceWidget
 import ir.pricewidget.app.widget.PriceWidgetReceiver
 import ir.pricewidget.app.work.WorkScheduler
 import kotlinx.coroutines.launch
@@ -66,6 +68,7 @@ fun AppScreen() {
             repo.saveCache(result, now)
             lastUpdated = now
             error = null
+            PriceWidget().updateAll(context)
         } catch (e: Exception) {
             response = repo.getCachedOnce()
             error = "اتصال برقرار نشد — آخرین دادهٔ ذخیره‌شده نمایش داده می‌شود"
@@ -169,7 +172,10 @@ fun AppScreen() {
                                             checked = selected.contains(key),
                                             onCheckedChange = { checked ->
                                                 selected = if (checked) selected + key else selected - key
-                                                scope.launch { repo.setSelectedItems(selected) }
+                                                scope.launch {
+                                                    repo.setSelectedItems(selected)
+                                                    PriceWidget().updateAll(context)
+                                                }
                                             }
                                         )
                                         Text(

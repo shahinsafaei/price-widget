@@ -3,27 +3,50 @@ package ir.pricewidget.app.widget
 import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
+import androidx.glance.GlanceTheme
 import androidx.glance.appwidget.GlanceAppWidget
+import androidx.glance.appwidget.SizeMode
+import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
 import androidx.glance.background
 import androidx.glance.layout.Alignment
+import androidx.glance.layout.Box
 import androidx.glance.layout.Column
 import androidx.glance.layout.Row
+import androidx.glance.layout.Spacer
+import androidx.glance.layout.defaultWeight
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
+import androidx.glance.layout.height
 import androidx.glance.layout.padding
+import androidx.glance.layout.size
+import androidx.glance.layout.width
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
+import androidx.glance.text.TextAlign
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import ir.pricewidget.app.data.GoldCurrencyResponse
 import ir.pricewidget.app.data.PrefsRepository
+import ir.pricewidget.app.data.PriceItem
+
+private val CardBg = Color(0xFFFFFFFF)
+private val TextDark = Color(0xFF1C1C1E)
+private val TextGray = Color(0xFF8E8E93)
+private val Positive = Color(0xFF34C759)
+private val Negative = Color(0xFFFF3B30)
+
+private val SMALL = DpSize(140.dp, 130.dp)
+private val LARGE = DpSize(250.dp, 220.dp)
 
 class PriceWidget : GlanceAppWidget() {
+
+    override val sizeMode = SizeMode.Responsive(setOf(SMALL, LARGE))
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val repo = PrefsRepository(context)
@@ -37,55 +60,88 @@ class PriceWidget : GlanceAppWidget() {
 
     @Composable
     private fun WidgetContent(response: GoldCurrencyResponse?, selectedKeys: Set<String>) {
-        val items = response?.allItems()?.filter { it.second.itemKey in selectedKeys } ?: emptyList()
+        val items = response?.allItems()
+            ?.map { it.second }
+            ?.filter { it.itemKey in selectedKeys }
+            ?: emptyList()
 
-        Column(
+        val size = androidx.glance.LocalSize.current
+
+        Box(
             modifier = GlanceModifier
                 .fillMaxSize()
-                .background(Color(0xFF1C1C1E))
-                .padding(14.dp)
+                .background(CardBg)
+                .cornerRadius(20.dp)
+                .padding(12.dp)
         ) {
-            Text(
-                text = "نرخ لحظه‌ای",
-                style = TextStyle(
-                    color = ColorProvider(Color(0xFF9A9A9E)),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium
-                )
-            )
+            when {
+                items.isEmpty() -> EmptyState()
+                size.width < 200.dp -> SingleItemLayout(items.first())
+                else -> ListLayout(items.take(4))
+            }
+        }
+    }
 
-            if (items.isEmpty()) {
+    @Composable
+    private fun EmptyState() {
+        Box(modifier = GlanceModifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text(
+                "آیتمی انتخاب نشده\nاپ رو باز کن",
+                style = TextStyle(color = ColorProvider(TextGray), fontSize = 12.sp, textAlign = TextAlign.Center)
+            )
+        }
+    }
+
+    @Composable
+    private fun SingleItemLayout(item: PriceItem) {
+        Column(modifier = GlanceModifier.fillMaxSize()) {
+            Row(verticalAlignment = Alignment.Vertical.CenterVertically) {
+                Badge(item)
+                Spacer(modifier = GlanceModifier.width(8.dp))
                 Text(
-                    text = "آیتمی انتخاب نشده — اپ رو باز کن",
-                    style = TextStyle(color = ColorProvider(Color.White), fontSize = 13.sp)
+                    item.displayName,
+                    style = TextStyle(color = ColorProvider(TextGray), fontSize = 13.sp, fontWeight = FontWeight.Medium)
                 )
-            } else {
-                items.take(5).forEach { (_, item) ->
-                    Row(
-                        modifier = GlanceModifier.fillMaxWidth().padding(vertical = 4.dp),
-                        verticalAlignment = Alignment.Vertical.CenterVertically
-                    ) {
-                        Text(
-                            text = item.displayName,
-                            style = TextStyle(color = ColorProvider(Color.White), fontSize = 14.sp),
-                            modifier = GlanceModifier.padding(end = 8.dp)
-                        )
-                        Column(modifier = GlanceModifier.fillMaxWidth()) {}
-                        val priceText = item.priceValue?.let { formatPrice(it) } ?: item.price ?: "--"
-                        Text(
-                            text = priceText,
-                            style = TextStyle(
-                                color = ColorProvider(Color.White),
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold
+            }
+            Spacer(modifier = GlanceModifier.height(10.dp))
+            ChangeBadge(item)
+            Text(
+                item.priceValue?.let { "%,.0f".format(it) } ?: item.price ?: "--",
+                style = TextStyle(color = ColorProvider(TextDark), fontSize = 30.sp, fontWeight = FontWeight.Bold)
+            )
+        }
+    }
+
+    @Composable
+    private fun ListLayout(items: List<PriceItem>) {
+        Column(modifier = GlanceModifier.fillMaxSize()) {
+            items.forEachIndexed { index, item ->
+                Row(
+                    modifier = GlanceModifier.fillMaxWidth().padding(vertical = 6.dp),
+                    verticalAlignment = Alignment.Vertical.CenterVertically
+                ) {
+                    Badge(item, small = true)
+                    Spacer(modifier = GlanceModifier.width(8.dp))
+                    Text(
+                        item.displayName,
+                        style = TextStyle(color = ColorProvider(TextDark), fontSize = 14.sp, fontWeight = FontWeight.Medium),
+                        modifier = GlanceModifier.defaultWeight()
+                    )
+                    Column(horizontalAlignment = Alignment.Horizontal.End) {
+                        val pct = item.changePercent
+                        if (pct != null) {
+                            val positive = pct >= 0
+                            Text(
+                                "${if (positive) "▲" else "▼"} ${"%.1f".format(kotlin.math.abs(pct))}%",
+                                style = TextStyle(
+                                    color = ColorProvider(if (positive) Positive else Negative),
+                                    fontSize = 10.sp
+                                )
                             )
-                        )
-                        val changePct = item.changePercent ?: 0.0
-                        val changeColor = if (changePct >= 0) Color(0xFF32D74B) else Color(0xFFFF453A)
+                        }
                         Text(
-                            text = "  ${if (changePct >= 0) "+" else ""}${"%.1f".format(changePct)}%",
-                            style = TextStyle(color = ColorProvider(changeColor), fontSize = 12.sp),
-                            modifier = GlanceModifier.padding(start = 6.dp)
+                            item.priceValue?.let { "%,.0f".format(it) } ?: item.price ?: "--",
+                            style = TextStyle(color = ColorProvider(TextDark), fontSize = 15.sp, fontWeight = FontWeight.Bold)
                         )
                     }
                 }
@@ -93,7 +149,40 @@ class PriceWidget : GlanceAppWidget() {
         }
     }
 
-    private fun formatPrice(value: Double): String {
-        return "%,.0f".format(value)
+    @Composable
+    private fun ChangeBadge(item: PriceItem) {
+        val pct = item.changePercent ?: return
+        val positive = pct >= 0
+        Text(
+            "${if (positive) "▲" else "▼"} ${"%.1f".format(kotlin.math.abs(pct))}%",
+            style = TextStyle(
+                color = ColorProvider(if (positive) Positive else Negative),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium
+            )
+        )
+    }
+
+    @Composable
+    private fun Badge(item: PriceItem, small: Boolean = false) {
+        val (emoji, color) = badgeFor(item.symbol)
+        val dim = if (small) 22.dp else 28.dp
+        Box(
+            modifier = GlanceModifier.size(dim).background(color).cornerRadius(dim / 2),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(emoji, style = TextStyle(fontSize = if (small) 11.sp else 14.sp))
+        }
+    }
+
+    private fun badgeFor(symbol: String?): Pair<String, Color> = when {
+        symbol == null -> "؟" to Color(0xFF8E8E93)
+        symbol.contains("USD") -> "$" to Color(0xFF2E7D32)
+        symbol.contains("EUR") -> "€" to Color(0xFF1565C0)
+        symbol.contains("GBP") -> "£" to Color(0xFF6A1B9A)
+        symbol.contains("GOLD") || symbol.contains("COIN") -> "🪙" to Color(0xFFD4A017)
+        symbol.contains("BTC") -> "₿" to Color(0xFFF7931A)
+        symbol.contains("ETH") -> "Ξ" to Color(0xFF627EEA)
+        else -> symbol.take(1) to Color(0xFF546E7A)
     }
 }
