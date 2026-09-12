@@ -12,7 +12,9 @@ data class PriceItem(
     @SerializedName("name") val name: String? = null,
     @SerializedName("name_en") val nameEn: String? = null,
     @SerializedName("symbol") val symbol: String? = null,
-    @SerializedName("price") val price: Double? = null,
+    // brsapi returns numbers for gold/currency but quoted strings for crypto —
+    // keeping this as String avoids Gson type-mismatch crashes; parse on demand.
+    @SerializedName("price") val price: String? = null,
     @SerializedName("change_value") val changeValue: Double? = null,
     @SerializedName("change_percent") val changePercent: Double? = null,
     @SerializedName("unit") val unit: String? = null,
@@ -25,6 +27,9 @@ data class PriceItem(
 
     val displayName: String
         get() = name ?: nameEn ?: symbol ?: "—"
+
+    val priceValue: Double?
+        get() = price?.toDoubleOrNull()
 }
 
 data class GoldCurrencyResponse(

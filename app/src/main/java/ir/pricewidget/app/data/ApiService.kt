@@ -7,12 +7,11 @@ import retrofit2.http.Query
 
 interface ApiService {
     // Base path used by brsapi.ir's free gold & currency webservice.
-    // Adjust the path here if brsapi's docs show a different route for your key.
-    @GET("Api/Market/gold_currency.php")
+    @GET("Market/Gold_Currency.php")
     suspend fun getGoldCurrency(@Query("key") key: String): GoldCurrencyResponse
 
     companion object {
-        private const val BASE_URL = "https://brsapi.ir/"
+        private const val BASE_URL = "https://api.brsapi.ir/"
 
         fun create(): ApiService {
             val retrofit = Retrofit.Builder()

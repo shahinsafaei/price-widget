@@ -1,6 +1,7 @@
 package ir.pricewidget.app.work
 
 import android.content.Context
+import androidx.work.Data
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
@@ -10,7 +11,7 @@ object WorkScheduler {
     private const val WORK_NAME = "price_update_work"
 
     fun schedule(context: Context) {
-        val request = PeriodicWorkRequestBuilder<UpdateWorker>(30, TimeUnit.MINUTES)
+        val request = PeriodicWorkRequestBuilder<UpdateWorker>(1, TimeUnit.HOURS)
             .build()
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
             WORK_NAME,
@@ -20,7 +21,10 @@ object WorkScheduler {
     }
 
     fun runOnce(context: Context) {
-        val request = androidx.work.OneTimeWorkRequestBuilder<UpdateWorker>().build()
+        val manualData = Data.Builder().putBoolean(UpdateWorker.KEY_MANUAL, true).build()
+        val request = androidx.work.OneTimeWorkRequestBuilder<UpdateWorker>()
+            .setInputData(manualData)
+            .build()
         WorkManager.getInstance(context).enqueue(request)
     }
 }

@@ -71,7 +71,7 @@ class PriceWidget : GlanceAppWidget() {
                             modifier = GlanceModifier.padding(end = 8.dp)
                         )
                         Column(modifier = GlanceModifier.fillMaxWidth()) {}
-                        val priceText = item.price?.let { formatPrice(it) } ?: "--"
+                        val priceText = item.priceValue?.let { formatPrice(it) } ?: item.price ?: "--"
                         Text(
                             text = priceText,
                             style = TextStyle(
