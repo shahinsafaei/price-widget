@@ -19,7 +19,6 @@ import androidx.glance.layout.Box
 import androidx.glance.layout.Column
 import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
-import androidx.glance.layout.defaultWeight
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
@@ -125,7 +124,7 @@ class PriceWidget : GlanceAppWidget() {
                     Text(
                         item.displayName,
                         style = TextStyle(color = ColorProvider(TextDark), fontSize = 14.sp, fontWeight = FontWeight.Medium),
-                        modifier = GlanceModifier.defaultWeight()
+                        modifier = GlanceModifier.width(90.dp)
                     )
                     Column(horizontalAlignment = Alignment.Horizontal.End) {
                         val pct = item.changePercent
