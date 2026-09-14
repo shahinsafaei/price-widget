@@ -19,6 +19,7 @@ class PrefsRepository(private val context: Context) {
         val SELECTED_ITEMS = stringSetPreferencesKey("selected_items")
         val CACHED_JSON = stringPreferencesKey("cached_json")
         val LAST_UPDATED = stringPreferencesKey("last_updated")
+        val WIDGET_DARK = androidx.datastore.preferences.core.booleanPreferencesKey("widget_dark")
     }
 
     // Default key is the one you already have from brsapi.ir.
@@ -40,6 +41,14 @@ class PrefsRepository(private val context: Context) {
     }
 
     val lastUpdatedFlow: Flow<String?> = context.dataStore.data.map { it[Keys.LAST_UPDATED] }
+
+    val isDarkWidgetFlow: Flow<Boolean> = context.dataStore.data.map { it[Keys.WIDGET_DARK] ?: false }
+
+    suspend fun setWidgetDark(dark: Boolean) {
+        context.dataStore.edit { it[Keys.WIDGET_DARK] = dark }
+    }
+
+    suspend fun isDarkWidgetOnce(): Boolean = isDarkWidgetFlow.first()
 
     suspend fun setApiKey(key: String) {
         context.dataStore.edit { it[Keys.API_KEY] = key }

@@ -7,6 +7,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -47,7 +48,27 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun AppScreen() {
+fun SegmentedThemeToggle(isDark: Boolean, onChange: (Boolean) -> Unit) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        listOf(false to "روشن", true to "تیره").forEach { (dark, label) ->
+            val selected = isDark == dark
+            Text(
+                label,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(if (selected) MaterialTheme.colorScheme.primary else androidx.compose.ui.graphics.Color.Transparent)
+                    .clickable { onChange(dark) }
+                    .padding(horizontal = 14.dp, vertical = 6.dp),
+                style = MaterialTheme.typography.labelMedium,
+                color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+            )
+        }
+    }
+}
     val context = androidx.compose.ui.platform.LocalContext.current
     val repo = remember { PrefsRepository(context) }
     val scope = rememberCoroutineScope()
@@ -58,6 +79,9 @@ fun AppScreen() {
     var refreshing by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var lastUpdated by remember { mutableStateOf<String?>(null) }
+
+    var isDark by remember { mutableStateOf(false) }
+    var limitMessage by remember { mutableStateOf<String?>(null) }
 
     suspend fun refresh() {
         val apiKey = repo.getApiKeyOnce()
@@ -77,6 +101,7 @@ fun AppScreen() {
 
     LaunchedEffect(Unit) {
         selected = repo.getSelectedItemsOnce()
+        isDark = repo.isDarkWidgetOnce()
         refresh()
         loading = false
     }
@@ -112,10 +137,22 @@ fun AppScreen() {
                 }
             }
             Text(
-                lastUpdated?.let { "آخرین بروزرسانی: $it" } ?: "آیتم‌هایی که می‌خوای توی ویجت ببینی رو انتخاب کن",
+                lastUpdated?.let { "آخرین بروزرسانی: $it" } ?: "حداکثر ۳ آیتم برای ویجت انتخاب کن",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
             )
+
+            Spacer(Modifier.height(10.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("تم ویجت:", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(end = 8.dp))
+                SegmentedThemeToggle(isDark = isDark) { dark ->
+                    isDark = dark
+                    scope.launch {
+                        repo.setWidgetDark(dark)
+                        PriceWidget().updateAll(context)
+                    }
+                }
+            }
         }
 
         error?.let {
@@ -124,6 +161,14 @@ fun AppScreen() {
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp)
+            )
+        }
+        limitMessage?.let {
+            Text(
+                it,
+                color = MaterialTheme.colorScheme.tertiary,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp)
             )
         }
 
@@ -171,10 +216,15 @@ fun AppScreen() {
                                         Checkbox(
                                             checked = selected.contains(key),
                                             onCheckedChange = { checked ->
-                                                selected = if (checked) selected + key else selected - key
-                                                scope.launch {
-                                                    repo.setSelectedItems(selected)
-                                                    PriceWidget().updateAll(context)
+                                                if (checked && selected.size >= 3) {
+                                                    limitMessage = "حداکثر ۳ آیتم برای ویجت قابل انتخابه"
+                                                } else {
+                                                    selected = if (checked) selected + key else selected - key
+                                                    limitMessage = null
+                                                    scope.launch {
+                                                        repo.setSelectedItems(selected)
+                                                        PriceWidget().updateAll(context)
+                                                    }
                                                 }
                                             }
                                         )
