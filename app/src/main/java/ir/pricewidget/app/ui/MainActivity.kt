@@ -19,6 +19,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -76,6 +77,7 @@ fun SegmentedThemeToggle(isDark: Boolean, onChange: (Boolean) -> Unit) {
 fun PriceCard(
     priceItem: ir.pricewidget.app.data.PriceItem,
     checked: Boolean,
+    enabled: Boolean = true,
     modifier: Modifier = Modifier,
     onToggle: (Boolean) -> Unit
 ) {
@@ -83,13 +85,14 @@ fun PriceCard(
     val positive = (pct ?: 0.0) >= 0
     Column(
         modifier = modifier
+            .alpha(if (enabled || checked) 1f else 0.35f)
             .clip(RoundedCornerShape(16.dp))
             .background(MaterialTheme.colorScheme.surface)
             .then(
                 if (checked) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(16.dp))
                 else Modifier.border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f), RoundedCornerShape(16.dp))
             )
-            .clickable { onToggle(!checked) }
+            .clickable(enabled = enabled || checked) { onToggle(!checked) }
             .padding(12.dp)
     ) {
         Row(
@@ -198,11 +201,6 @@ fun AppScreen() {
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                 )
             }
-            Text(
-                "حداکثر ۳ آیتم برای ویجت انتخاب کن — بروزرسانی خودکار هر ساعت (۱۱ تا ۱۷)",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-            )
         }
 
         error?.let {
@@ -258,6 +256,7 @@ fun AppScreen() {
                                     PriceCard(
                                         priceItem = priceItem,
                                         checked = selected.contains(priceItem.itemKey),
+                                        enabled = selected.size < 3,
                                         modifier = Modifier.weight(1f),
                                         onToggle = { checked ->
                                             val key = priceItem.itemKey

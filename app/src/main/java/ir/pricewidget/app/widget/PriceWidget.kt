@@ -10,6 +10,8 @@ import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.Image
 import androidx.glance.ImageProvider
+import androidx.glance.action.actionStartActivity
+import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.cornerRadius
@@ -66,7 +68,7 @@ private val LARGE = DpSize(280.dp, 260.dp)
 private fun formatWidgetPrice(item: PriceItem): String {
     val v = item.priceValue ?: return item.price ?: "--"
     return if (v >= 1_000_000) {
-        "%,d".format(Math.round(v / 1000.0))
+        "%,dm".format(Math.round(v / 1000.0))
     } else {
         "%,.0f".format(v)
     }
@@ -100,6 +102,7 @@ class PriceWidget : GlanceAppWidget() {
                 .fillMaxSize()
                 .background(palette.cardBg)
                 .cornerRadius(22.dp)
+                .clickable(actionStartActivity<ir.pricewidget.app.ui.MainActivity>())
                 .padding(10.dp)
         ) {
             when {
@@ -249,7 +252,7 @@ class PriceWidget : GlanceAppWidget() {
         symbol.contains("TRY") -> "₺" to Color(0xFFE30A17)
         symbol.contains("CNY") -> "¥" to Color(0xFFDE2910)
         symbol.contains("JPY") -> "¥" to Color(0xFFBC002D)
-        symbol.contains("GOLD") -> "Au" to Color(0xFFD4A017)
+        symbol.contains("GOLD") -> "🪙" to Color(0xFFD4A017)
         symbol.contains("COIN") -> "🪙" to Color(0xFFD4A017)
         symbol.contains("BTC") -> "₿" to Color(0xFFF7931A)
         symbol.contains("ETH") -> "Ξ" to Color(0xFF627EEA)
