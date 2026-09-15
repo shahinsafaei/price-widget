@@ -300,13 +300,40 @@ fun AppScreen() {
             }
 
             Spacer(Modifier.height(10.dp))
-            Text(
-                stringResource(R.string.developer_credit),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                textAlign = TextAlign.Center
-            )
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "طراحی و توسعه: شاهین صفایی",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
+                )
+                Text(
+                    " · @shahinsafaei",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.clickable {
+                        val intent = try {
+                            android.content.Intent(
+                                android.content.Intent.ACTION_VIEW,
+                                android.net.Uri.parse("instagram://user?username=shahinsafaei")
+                            ).apply { setPackage("com.instagram.android") }
+                        } catch (e: Exception) { null }
+                        try {
+                            context.startActivity(intent)
+                        } catch (e: Exception) {
+                            context.startActivity(
+                                android.content.Intent(
+                                    android.content.Intent.ACTION_VIEW,
+                                    android.net.Uri.parse("https://instagram.com/shahinsafaei")
+                                )
+                            )
+                        }
+                    }
+                )
+            }
         }
     }
 
