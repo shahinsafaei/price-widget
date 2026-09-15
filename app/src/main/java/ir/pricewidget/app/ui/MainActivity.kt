@@ -311,14 +311,16 @@ fun AppScreen() {
     }
 
     if (showWidgetDialog) {
+        var dialogDark by remember { mutableStateOf(isDark) }
         WidgetSetupDialog(
-            isDark = isDark,
-            onThemeChange = { dark -> isDark = dark },
+            isDark = dialogDark,
+            onThemeChange = { dark -> dialogDark = dark },
             onDismiss = { showWidgetDialog = false },
             onConfirm = {
                 showWidgetDialog = false
+                isDark = dialogDark
                 scope.launch {
-                    repo.setWidgetDark(isDark)
+                    repo.setWidgetDark(dialogDark)
                     PriceWidget().updateAll(context)
                 }
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
