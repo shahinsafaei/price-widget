@@ -8,6 +8,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
+import androidx.glance.Image
+import androidx.glance.ImageProvider
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.cornerRadius
@@ -201,13 +203,51 @@ class PriceWidget : GlanceAppWidget() {
 
     @Composable
     private fun Badge(item: PriceItem, small: Boolean = false) {
-        val emoji = ir.pricewidget.app.data.IconMap.flag(item.symbol)
         val dim = if (small) 22.dp else 30.dp
-        Box(
-            modifier = GlanceModifier.size(dim),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(emoji, style = TextStyle(fontSize = if (small) 15.sp else 20.sp))
+        val flagRes = ir.pricewidget.app.data.IconMap.flagDrawableRes(item.symbol)
+        if (flagRes != null) {
+            Box(
+                modifier = GlanceModifier.size(dim).cornerRadius(dim / 2)
+            ) {
+                Image(
+                    provider = ImageProvider(flagRes),
+                    contentDescription = item.displayName,
+                    modifier = GlanceModifier.size(dim).cornerRadius(dim / 2),
+                    contentScale = androidx.glance.layout.ContentScale.Crop
+                )
+            }
+        } else {
+            val (label, color) = badgeFor(item.symbol)
+            Box(
+                modifier = GlanceModifier.size(dim).background(color).cornerRadius(dim / 2),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    label,
+                    style = TextStyle(color = ColorProvider(Color.White), fontSize = if (small) 10.sp else 13.sp, fontWeight = FontWeight.Bold)
+                )
+            }
         }
+    }
+
+    private fun badgeFor(symbol: String?): Pair<String, Color> = when {
+        symbol == null -> "?" to Color(0xFF8E8E93)
+        symbol.contains("USDT") -> "T" to Color(0xFF26A17B)
+        symbol.contains("USD") -> "$" to Color(0xFF2E7D32)
+        symbol.contains("EUR") -> "€" to Color(0xFF1565C0)
+        symbol.contains("GBP") -> "£" to Color(0xFF6A1B9A)
+        symbol.contains("AED") -> "د.إ" to Color(0xFF00732F)
+        symbol.contains("TRY") -> "₺" to Color(0xFFE30A17)
+        symbol.contains("CNY") -> "¥" to Color(0xFFDE2910)
+        symbol.contains("JPY") -> "¥" to Color(0xFFBC002D)
+        symbol.contains("GOLD") -> "Au" to Color(0xFFD4A017)
+        symbol.contains("COIN") -> "🪙" to Color(0xFFD4A017)
+        symbol.contains("BTC") -> "₿" to Color(0xFFF7931A)
+        symbol.contains("ETH") -> "Ξ" to Color(0xFF627EEA)
+        symbol.contains("XRP") -> "X" to Color(0xFF23292F)
+        symbol.contains("BNB") -> "B" to Color(0xFFF3BA2F)
+        symbol.contains("SOL") -> "S" to Color(0xFF9945FF)
+        symbol.contains("DOGE") -> "D" to Color(0xFFC2A633)
+        else -> symbol.take(1) to Color(0xFF546E7A)
     }
 }

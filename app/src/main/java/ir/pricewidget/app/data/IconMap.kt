@@ -1,7 +1,42 @@
 package ir.pricewidget.app.data
 
+import ir.pricewidget.app.R
+
 /** Maps symbols to flag emojis / icons and short widget-friendly labels. */
 object IconMap {
+
+    /** Returns a drawable resource id for a real flag PNG, or null if none applies (gold/crypto). */
+    fun flagDrawableRes(symbol: String?): Int? = when {
+        symbol == null -> null
+        symbol.contains("USD") && !symbol.contains("USDT") -> R.drawable.flag_us
+        symbol.contains("EUR") -> R.drawable.flag_eu
+        symbol.contains("GBP") -> R.drawable.flag_gb
+        symbol.contains("AED") -> R.drawable.flag_ae
+        symbol.contains("JPY") -> R.drawable.flag_jp
+        symbol.contains("CNY") -> R.drawable.flag_cn
+        symbol.contains("TRY") -> R.drawable.flag_tr
+        symbol.contains("CHF") -> R.drawable.flag_ch
+        symbol.contains("CAD") -> R.drawable.flag_ca
+        symbol.contains("AUD") -> R.drawable.flag_au
+        symbol.contains("SAR") -> R.drawable.flag_sa
+        symbol.contains("KWD") -> R.drawable.flag_kw
+        symbol.contains("QAR") -> R.drawable.flag_qa
+        symbol.contains("OMR") -> R.drawable.flag_om
+        symbol.contains("BHD") -> R.drawable.flag_bh
+        symbol.contains("IQD") -> R.drawable.flag_iq
+        symbol.contains("AFN") -> R.drawable.flag_af
+        symbol.contains("RUB") -> R.drawable.flag_ru
+        symbol.contains("INR") -> R.drawable.flag_in
+        symbol.contains("PKR") -> R.drawable.flag_pk
+        symbol.contains("SEK") -> R.drawable.flag_se
+        symbol.contains("THB") -> R.drawable.flag_th
+        symbol.contains("MYR") -> R.drawable.flag_my
+        symbol.contains("AZN") -> R.drawable.flag_az
+        symbol.contains("AMD") -> R.drawable.flag_am
+        symbol.contains("GEL") -> R.drawable.flag_ge
+        symbol.contains("SYP") -> R.drawable.flag_sy
+        else -> null // gold, coins, crypto, tether -> use colored letter badge instead
+    }
 
     fun flag(symbol: String?): String = when {
         symbol == null -> "💱"
