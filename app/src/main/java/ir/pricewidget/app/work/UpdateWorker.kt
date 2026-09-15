@@ -33,6 +33,7 @@ class UpdateWorker(
             val now = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
             repo.saveCache(response, now)
             PriceWidget().updateAll(applicationContext)
+            ir.pricewidget.app.notification.RateNotifier.show(applicationContext)
             Result.success()
         } catch (e: Exception) {
             Result.retry()

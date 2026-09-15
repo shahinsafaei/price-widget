@@ -154,6 +154,7 @@ fun AppScreen() {
     var lastUpdated by remember { mutableStateOf<String?>(null) }
 
     var isDark by remember { mutableStateOf(false) }
+    var notifEnabled by remember { mutableStateOf(false) }
     var limitMessage by remember { mutableStateOf<String?>(null) }
 
     suspend fun refresh() {
@@ -175,7 +176,9 @@ fun AppScreen() {
     LaunchedEffect(Unit) {
         selected = repo.getSelectedItemsOnce()
         isDark = repo.isDarkWidgetOnce()
+        notifEnabled = repo.isNotificationEnabledOnce()
         refresh()
+        if (notifEnabled) ir.pricewidget.app.notification.RateNotifier.show(context)
         loading = false
     }
 
@@ -195,11 +198,30 @@ fun AppScreen() {
                     stringResource(R.string.app_name),
                     style = MaterialTheme.typography.headlineMedium
                 )
-                Text(
-                    lastUpdated?.let { "بروزرسانی: $it" } ?: "",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        lastUpdated?.let { "بروزرسانی: $it" } ?: "",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                        modifier = Modifier.padding(end = 6.dp)
+                    )
+                    IconButton(
+                        onClick = {
+                            scope.launch {
+                                refreshing = true
+                                refresh()
+                                refreshing = false
+                            }
+                        },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        if (refreshing) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Filled.Refresh, contentDescription = "بروزرسانی", modifier = Modifier.size(18.dp))
+                        }
+                    }
+                }
             }
         }
 
@@ -291,6 +313,46 @@ fun AppScreen() {
                 .background(MaterialTheme.colorScheme.surface)
                 .padding(16.dp)
         ) {
+            val notifPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+                androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+            ) { granted ->
+                if (granted) {
+                    notifEnabled = true
+                    scope.launch {
+                        repo.setNotificationEnabled(true)
+                        ir.pricewidget.app.notification.RateNotifier.show(context)
+                    }
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("نمایش در نوار اعلان‌ها", style = MaterialTheme.typography.bodyMedium)
+                Switch(
+                    checked = notifEnabled,
+                    onCheckedChange = { checked ->
+                        if (checked) {
+                            if (Build.VERSION.SDK_INT >= 33) {
+                                notifPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                            } else {
+                                notifEnabled = true
+                                scope.launch {
+                                    repo.setNotificationEnabled(true)
+                                    ir.pricewidget.app.notification.RateNotifier.show(context)
+                                }
+                            }
+                        } else {
+                            notifEnabled = false
+                            scope.launch { repo.setNotificationEnabled(false) }
+                            ir.pricewidget.app.notification.RateNotifier.cancel(context)
+                        }
+                    }
+                )
+            }
+
             Button(
                 onClick = { showWidgetDialog = true },
                 modifier = Modifier.fillMaxWidth().height(50.dp),

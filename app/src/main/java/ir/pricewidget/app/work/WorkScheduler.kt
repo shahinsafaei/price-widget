@@ -11,7 +11,11 @@ object WorkScheduler {
     private const val WORK_NAME = "price_update_work"
 
     fun schedule(context: Context) {
+        val constraints = androidx.work.Constraints.Builder()
+            .setRequiredNetworkType(androidx.work.NetworkType.CONNECTED)
+            .build()
         val request = PeriodicWorkRequestBuilder<UpdateWorker>(1, TimeUnit.HOURS)
+            .setConstraints(constraints)
             .build()
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
             WORK_NAME,

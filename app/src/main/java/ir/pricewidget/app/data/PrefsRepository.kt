@@ -20,6 +20,7 @@ class PrefsRepository(private val context: Context) {
         val CACHED_JSON = stringPreferencesKey("cached_json")
         val LAST_UPDATED = stringPreferencesKey("last_updated")
         val WIDGET_DARK = androidx.datastore.preferences.core.booleanPreferencesKey("widget_dark")
+        val NOTIF_ENABLED = androidx.datastore.preferences.core.booleanPreferencesKey("notif_enabled")
     }
 
     // Default key is the one you already have from brsapi.ir.
@@ -49,6 +50,14 @@ class PrefsRepository(private val context: Context) {
     }
 
     suspend fun isDarkWidgetOnce(): Boolean = isDarkWidgetFlow.first()
+
+    val notificationEnabledFlow: Flow<Boolean> = context.dataStore.data.map { it[Keys.NOTIF_ENABLED] ?: false }
+
+    suspend fun setNotificationEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.NOTIF_ENABLED] = enabled }
+    }
+
+    suspend fun isNotificationEnabledOnce(): Boolean = notificationEnabledFlow.first()
 
     suspend fun setApiKey(key: String) {
         context.dataStore.edit { it[Keys.API_KEY] = key }

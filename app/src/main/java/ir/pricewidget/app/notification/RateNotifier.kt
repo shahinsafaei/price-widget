@@ -1,0 +1,86 @@
+package ir.pricewidget.app.notification
+
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
+import android.os.Build
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
+import ir.pricewidget.app.R
+import ir.pricewidget.app.data.PrefsRepository
+import ir.pricewidget.app.ui.MainActivity
+
+object RateNotifier {
+    private const val CHANNEL_ID = "rate_updates"
+    private const val NOTIF_ID = 1001
+
+    private fun ensureChannel(context: Context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val manager = context.getSystemService(NotificationManager::class.java)
+            if (manager.getNotificationChannel(CHANNEL_ID) == null) {
+                val channel = NotificationChannel(
+                    CHANNEL_ID,
+                    "بروزرسانی نرخ‌ها",
+                    NotificationManager.IMPORTANCE_LOW
+                ).apply {
+                    description = "نمایش دائمی نرخ‌های انتخابی"
+                    setShowBadge(false)
+                }
+                manager.createNotificationChannel(channel)
+            }
+        }
+    }
+
+    /** Builds/refreshes the persistent notification using the latest cached data. */
+    suspend fun show(context: Context) {
+        val repo = PrefsRepository(context)
+        if (!repo.isNotificationEnabledOnce()) return
+
+        ensureChannel(context)
+
+        val selected = repo.getSelectedItemsOnce()
+        val cached = repo.getCachedOnce()
+        val items = cached?.allItems()
+            ?.map { it.second }
+            ?.filter { it.itemKey in selected }
+            ?: emptyList()
+
+        val contentText = if (items.isEmpty()) {
+            "آیتمی انتخاب نشده — اپ رو باز کن"
+        } else {
+            items.joinToString("   ·   ") { item ->
+                val price = item.priceValue?.let { "%,.0f".format(it) } ?: item.price ?: "--"
+                "${item.displayName}: $price"
+            }
+        }
+
+        val openAppIntent = Intent(context, MainActivity::class.java)
+        val pendingIntent = PendingIntent.getActivity(
+            context, 0, openAppIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentTitle("نرخ لحظه‌ای")
+            .setContentText(contentText)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(contentText))
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setContentIntent(pendingIntent)
+            .build()
+
+        try {
+            NotificationManagerCompat.from(context).notify(NOTIF_ID, notification)
+        } catch (e: SecurityException) {
+            // Permission not granted; silently ignore.
+        }
+    }
+
+    fun cancel(context: Context) {
+        NotificationManagerCompat.from(context).cancel(NOTIF_ID)
+    }
+}
