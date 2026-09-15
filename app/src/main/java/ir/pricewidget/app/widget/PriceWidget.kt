@@ -8,6 +8,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
+import androidx.glance.Image
+import androidx.glance.ImageProvider
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.cornerRadius
@@ -60,6 +62,15 @@ private val Negative = Color(0xFFFF3B30)
 
 private val SMALL = DpSize(140.dp, 140.dp)
 private val LARGE = DpSize(280.dp, 260.dp)
+
+private fun formatWidgetPrice(item: PriceItem): String {
+    val v = item.priceValue ?: return item.price ?: "--"
+    return if (v >= 1_000_000) {
+        "%,d".format(Math.round(v / 1000.0))
+    } else {
+        "%,.0f".format(v)
+    }
+}
 
 class PriceWidget : GlanceAppWidget() {
 
@@ -118,23 +129,26 @@ class PriceWidget : GlanceAppWidget() {
                 .cornerRadius(18.dp)
                 .padding(14.dp)
         ) {
-            Column(
-                modifier = GlanceModifier.fillMaxSize(),
-                verticalAlignment = Alignment.Vertical.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.Vertical.CenterVertically) {
-                    Badge(item, small = true)
-                    Spacer(modifier = GlanceModifier.width(8.dp))
-                    Text(
-                        item.displayName,
-                        style = TextStyle(color = ColorProvider(palette.textSecondary), fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                    )
+            Column(modifier = GlanceModifier.fillMaxSize()) {
+                Row(
+                    modifier = GlanceModifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.Vertical.CenterVertically
+                ) {
+                    Badge(item, small = false)
+                    Spacer(modifier = GlanceModifier.defaultWeight())
+                    Column(horizontalAlignment = Alignment.Horizontal.End) {
+                        Text(
+                            ir.pricewidget.app.data.IconMap.shortLabel(item.symbol, item.displayName),
+                            style = TextStyle(color = ColorProvider(palette.textPrimary), fontSize = 13.sp, fontWeight = FontWeight.Medium),
+                            maxLines = 1
+                        )
+                    }
                 }
-                Spacer(modifier = GlanceModifier.height(10.dp))
+                Spacer(modifier = GlanceModifier.defaultWeight())
                 ChangeText(item, fontSize = 13.sp)
                 Text(
-                    item.priceValue?.let { "%,.0f".format(it) } ?: item.price ?: "--",
-                    style = TextStyle(color = ColorProvider(palette.textPrimary), fontSize = 22.sp, fontWeight = FontWeight.Bold),
+                    formatWidgetPrice(item),
+                    style = TextStyle(color = ColorProvider(palette.textPrimary), fontSize = 24.sp, fontWeight = FontWeight.Bold),
                     maxLines = 1
                 )
             }
@@ -165,15 +179,16 @@ class PriceWidget : GlanceAppWidget() {
             Badge(item, small = true)
             Spacer(modifier = GlanceModifier.width(8.dp))
             Text(
-                item.displayName,
+                ir.pricewidget.app.data.IconMap.shortLabel(item.symbol, item.displayName),
                 style = TextStyle(color = ColorProvider(palette.textPrimary), fontSize = 13.sp, fontWeight = FontWeight.Medium),
-                maxLines = 1
+                maxLines = 1,
+                modifier = GlanceModifier.defaultWeight()
             )
-            Spacer(modifier = GlanceModifier.defaultWeight())
+            Spacer(modifier = GlanceModifier.width(6.dp))
             Column(horizontalAlignment = Alignment.Horizontal.End) {
                 ChangeText(item, fontSize = 10.sp)
                 Text(
-                    item.priceValue?.let { "%,.0f".format(it) } ?: item.price ?: "--",
+                    formatWidgetPrice(item),
                     style = TextStyle(color = ColorProvider(palette.textPrimary), fontSize = 15.sp, fontWeight = FontWeight.Bold),
                     maxLines = 1
                 )
@@ -197,24 +212,51 @@ class PriceWidget : GlanceAppWidget() {
 
     @Composable
     private fun Badge(item: PriceItem, small: Boolean = false) {
-        val (emoji, color) = badgeFor(item.symbol)
-        val dim = if (small) 20.dp else 28.dp
-        Box(
-            modifier = GlanceModifier.size(dim).background(color).cornerRadius(dim / 2),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(emoji, style = TextStyle(fontSize = if (small) 10.sp else 14.sp))
+        val dim = if (small) 22.dp else 30.dp
+        val flagRes = ir.pricewidget.app.data.IconMap.flagDrawableRes(item.symbol)
+        if (flagRes != null) {
+            Box(
+                modifier = GlanceModifier.size(dim).cornerRadius(dim / 2)
+            ) {
+                Image(
+                    provider = ImageProvider(flagRes),
+                    contentDescription = item.displayName,
+                    modifier = GlanceModifier.size(dim).cornerRadius(dim / 2),
+                    contentScale = androidx.glance.layout.ContentScale.Crop
+                )
+            }
+        } else {
+            val (label, color) = badgeFor(item.symbol)
+            Box(
+                modifier = GlanceModifier.size(dim).background(color).cornerRadius(dim / 2),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    label,
+                    style = TextStyle(color = ColorProvider(Color.White), fontSize = if (small) 10.sp else 13.sp, fontWeight = FontWeight.Bold)
+                )
+            }
         }
     }
 
     private fun badgeFor(symbol: String?): Pair<String, Color> = when {
-        symbol == null -> "؟" to Color(0xFF8E8E93)
+        symbol == null -> "?" to Color(0xFF8E8E93)
+        symbol.contains("USDT") -> "T" to Color(0xFF26A17B)
         symbol.contains("USD") -> "$" to Color(0xFF2E7D32)
         symbol.contains("EUR") -> "€" to Color(0xFF1565C0)
         symbol.contains("GBP") -> "£" to Color(0xFF6A1B9A)
-        symbol.contains("GOLD") || symbol.contains("COIN") -> "🪙" to Color(0xFFD4A017)
+        symbol.contains("AED") -> "د.إ" to Color(0xFF00732F)
+        symbol.contains("TRY") -> "₺" to Color(0xFFE30A17)
+        symbol.contains("CNY") -> "¥" to Color(0xFFDE2910)
+        symbol.contains("JPY") -> "¥" to Color(0xFFBC002D)
+        symbol.contains("GOLD") -> "Au" to Color(0xFFD4A017)
+        symbol.contains("COIN") -> "🪙" to Color(0xFFD4A017)
         symbol.contains("BTC") -> "₿" to Color(0xFFF7931A)
         symbol.contains("ETH") -> "Ξ" to Color(0xFF627EEA)
+        symbol.contains("XRP") -> "X" to Color(0xFF23292F)
+        symbol.contains("BNB") -> "B" to Color(0xFFF3BA2F)
+        symbol.contains("SOL") -> "S" to Color(0xFF9945FF)
+        symbol.contains("DOGE") -> "D" to Color(0xFFC2A633)
         else -> symbol.take(1) to Color(0xFF546E7A)
     }
 }
