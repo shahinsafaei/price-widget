@@ -7,9 +7,11 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
@@ -67,6 +69,70 @@ fun SegmentedThemeToggle(isDark: Boolean, onChange: (Boolean) -> Unit) {
                 color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
             )
         }
+    }
+}
+
+@Composable
+fun PriceCard(
+    priceItem: ir.pricewidget.app.data.PriceItem,
+    checked: Boolean,
+    modifier: Modifier = Modifier,
+    onToggle: (Boolean) -> Unit
+) {
+    val pct = priceItem.changePercent
+    val positive = (pct ?: 0.0) >= 0
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .then(
+                if (checked) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(16.dp))
+                else Modifier
+            )
+            .clickable { onToggle(!checked) }
+            .padding(12.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top
+        ) {
+            Text(
+                ir.pricewidget.app.data.IconMap.flag(priceItem.symbol),
+                style = MaterialTheme.typography.titleMedium
+            )
+            if (checked) {
+                Box(
+                    modifier = Modifier
+                        .size(18.dp)
+                        .clip(RoundedCornerShape(9.dp))
+                        .background(MaterialTheme.colorScheme.primary),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("✓", color = MaterialTheme.colorScheme.onPrimary, style = MaterialTheme.typography.labelSmall)
+                }
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            priceItem.displayName,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium
+        )
+        Spacer(Modifier.height(8.dp))
+        if (pct != null) {
+            Text(
+                "${if (positive) "+" else ""}${"%.1f".format(pct)}%",
+                style = MaterialTheme.typography.labelSmall,
+                color = if (positive) androidx.compose.ui.graphics.Color(0xFF32D74B)
+                        else androidx.compose.ui.graphics.Color(0xFFFF453A)
+            )
+        }
+        Text(
+            priceItem.priceValue?.let { "%,.0f".format(it) } ?: priceItem.price ?: "--",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold
+        )
     }
 }
 
@@ -201,68 +267,37 @@ fun AppScreen() {
                                 modifier = Modifier.padding(top = 14.dp, bottom = 6.dp, start = 4.dp)
                             )
                         }
-                        item {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(16.dp))
-                                    .background(MaterialTheme.colorScheme.surface)
+                        val rows = categoryItems.chunked(2)
+                        items(rows) { rowItems ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                categoryItems.forEachIndexed { index, (_, priceItem) ->
-                                    val key = priceItem.itemKey
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 14.dp, vertical = 10.dp)
-                                    ) {
-                                        Checkbox(
-                                            checked = selected.contains(key),
-                                            onCheckedChange = { checked ->
-                                                if (checked && selected.size >= 3) {
-                                                    limitMessage = "حداکثر ۳ آیتم برای ویجت قابل انتخابه"
-                                                } else {
-                                                    selected = if (checked) selected + key else selected - key
-                                                    limitMessage = null
-                                                    scope.launch {
-                                                        repo.setSelectedItems(selected)
-                                                        PriceWidget().updateAll(context)
-                                                    }
+                                rowItems.forEach { (_, priceItem) ->
+                                    PriceCard(
+                                        priceItem = priceItem,
+                                        checked = selected.contains(priceItem.itemKey),
+                                        modifier = Modifier.weight(1f),
+                                        onToggle = { checked ->
+                                            val key = priceItem.itemKey
+                                            if (checked && selected.size >= 3) {
+                                                limitMessage = "حداکثر ۳ آیتم برای ویجت قابل انتخابه"
+                                            } else {
+                                                selected = if (checked) selected + key else selected - key
+                                                limitMessage = null
+                                                scope.launch {
+                                                    repo.setSelectedItems(selected)
+                                                    PriceWidget().updateAll(context)
                                                 }
                                             }
-                                        )
-                                        Text(
-                                            priceItem.displayName,
-                                            modifier = Modifier.weight(1f),
-                                            style = MaterialTheme.typography.bodyLarge
-                                        )
-                                        Column(horizontalAlignment = Alignment.End) {
-                                            Text(
-                                                priceItem.priceValue?.let { "%,.0f".format(it) }
-                                                    ?: priceItem.price ?: "--",
-                                                style = MaterialTheme.typography.bodyLarge,
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                            val pct = priceItem.changePercent
-                                            if (pct != null) {
-                                                val positive = pct >= 0
-                                                Text(
-                                                    "${if (positive) "+" else ""}${"%.1f".format(pct)}%",
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = if (positive) androidx.compose.ui.graphics.Color(0xFF32D74B)
-                                                            else androidx.compose.ui.graphics.Color(0xFFFF453A)
-                                                )
-                                            }
                                         }
-                                    }
-                                    if (index != categoryItems.lastIndex) {
-                                        HorizontalDivider(
-                                            modifier = Modifier.padding(horizontal = 14.dp),
-                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
-                                        )
-                                    }
+                                    )
+                                }
+                                if (rowItems.size == 1) {
+                                    Spacer(Modifier.weight(1f))
                                 }
                             }
+                            Spacer(Modifier.height(10.dp))
                         }
                     }
                     item { Spacer(Modifier.height(8.dp)) }

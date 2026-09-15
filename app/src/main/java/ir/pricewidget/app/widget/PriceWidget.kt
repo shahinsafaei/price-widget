@@ -127,16 +127,10 @@ class PriceWidget : GlanceAppWidget() {
                     Spacer(modifier = GlanceModifier.defaultWeight())
                     Column(horizontalAlignment = Alignment.Horizontal.End) {
                         Text(
-                            item.displayName,
+                            ir.pricewidget.app.data.IconMap.shortLabel(item.symbol, item.displayName),
                             style = TextStyle(color = ColorProvider(palette.textPrimary), fontSize = 13.sp, fontWeight = FontWeight.Medium),
                             maxLines = 1
                         )
-                        item.symbol?.let {
-                            Text(
-                                it,
-                                style = TextStyle(color = ColorProvider(palette.textSecondary), fontSize = 11.sp)
-                            )
-                        }
                     }
                 }
                 Spacer(modifier = GlanceModifier.defaultWeight())
@@ -174,7 +168,7 @@ class PriceWidget : GlanceAppWidget() {
             Badge(item, small = true)
             Spacer(modifier = GlanceModifier.width(8.dp))
             Text(
-                item.displayName,
+                ir.pricewidget.app.data.IconMap.shortLabel(item.symbol, item.displayName),
                 style = TextStyle(color = ColorProvider(palette.textPrimary), fontSize = 13.sp, fontWeight = FontWeight.Medium),
                 maxLines = 1,
                 modifier = GlanceModifier.defaultWeight()
@@ -207,24 +201,13 @@ class PriceWidget : GlanceAppWidget() {
 
     @Composable
     private fun Badge(item: PriceItem, small: Boolean = false) {
-        val (emoji, color) = badgeFor(item.symbol)
-        val dim = if (small) 20.dp else 28.dp
+        val emoji = ir.pricewidget.app.data.IconMap.flag(item.symbol)
+        val dim = if (small) 22.dp else 30.dp
         Box(
-            modifier = GlanceModifier.size(dim).background(color).cornerRadius(dim / 2),
+            modifier = GlanceModifier.size(dim),
             contentAlignment = Alignment.Center
         ) {
-            Text(emoji, style = TextStyle(fontSize = if (small) 10.sp else 14.sp))
+            Text(emoji, style = TextStyle(fontSize = if (small) 15.sp else 20.sp))
         }
-    }
-
-    private fun badgeFor(symbol: String?): Pair<String, Color> = when {
-        symbol == null -> "؟" to Color(0xFF8E8E93)
-        symbol.contains("USD") -> "$" to Color(0xFF2E7D32)
-        symbol.contains("EUR") -> "€" to Color(0xFF1565C0)
-        symbol.contains("GBP") -> "£" to Color(0xFF6A1B9A)
-        symbol.contains("GOLD") || symbol.contains("COIN") -> "🪙" to Color(0xFFD4A017)
-        symbol.contains("BTC") -> "₿" to Color(0xFFF7931A)
-        symbol.contains("ETH") -> "Ξ" to Color(0xFF627EEA)
-        else -> symbol.take(1) to Color(0xFF546E7A)
     }
 }
