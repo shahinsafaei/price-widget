@@ -118,23 +118,33 @@ class PriceWidget : GlanceAppWidget() {
                 .cornerRadius(18.dp)
                 .padding(14.dp)
         ) {
-            Column(
-                modifier = GlanceModifier.fillMaxSize(),
-                verticalAlignment = Alignment.Vertical.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.Vertical.CenterVertically) {
-                    Badge(item, small = true)
-                    Spacer(modifier = GlanceModifier.width(8.dp))
-                    Text(
-                        item.displayName,
-                        style = TextStyle(color = ColorProvider(palette.textSecondary), fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                    )
+            Column(modifier = GlanceModifier.fillMaxSize()) {
+                Row(
+                    modifier = GlanceModifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.Vertical.CenterVertically
+                ) {
+                    Badge(item, small = false)
+                    Spacer(modifier = GlanceModifier.defaultWeight())
+                    Column(horizontalAlignment = Alignment.Horizontal.End) {
+                        Text(
+                            item.displayName,
+                            style = TextStyle(color = ColorProvider(palette.textPrimary), fontSize = 13.sp, fontWeight = FontWeight.Medium),
+                            maxLines = 1
+                        )
+                        item.symbol?.let {
+                            Text(
+                                it,
+                                style = TextStyle(color = ColorProvider(palette.textSecondary), fontSize = 11.sp)
+                            )
+                        }
+                    }
                 }
-                Spacer(modifier = GlanceModifier.height(10.dp))
+                Spacer(modifier = GlanceModifier.defaultWeight())
                 ChangeText(item, fontSize = 13.sp)
                 Text(
                     item.priceValue?.let { "%,.0f".format(it) } ?: item.price ?: "--",
-                    style = TextStyle(color = ColorProvider(palette.textPrimary), fontSize = 28.sp, fontWeight = FontWeight.Bold)
+                    style = TextStyle(color = ColorProvider(palette.textPrimary), fontSize = 24.sp, fontWeight = FontWeight.Bold),
+                    maxLines = 1
                 )
             }
         }
@@ -143,44 +153,39 @@ class PriceWidget : GlanceAppWidget() {
     @Composable
     private fun GridLayout(items: List<PriceItem>, palette: Palette) {
         Column(modifier = GlanceModifier.fillMaxSize()) {
-            Row(modifier = GlanceModifier.fillMaxWidth().defaultWeight()) {
-                ItemCard(items[0], palette, GlanceModifier.defaultWeight().fillMaxHeight())
-                if (items.size > 1) {
-                    Spacer(modifier = GlanceModifier.width(8.dp))
-                    ItemCard(items[1], palette, GlanceModifier.defaultWeight().fillMaxHeight())
-                }
-            }
-            if (items.size > 2) {
-                Spacer(modifier = GlanceModifier.height(8.dp))
-                Row(modifier = GlanceModifier.fillMaxWidth().defaultWeight()) {
-                    ItemCard(items[2], palette, GlanceModifier.fillMaxWidth().fillMaxHeight())
+            items.forEachIndexed { index, item ->
+                RowCard(item, palette, GlanceModifier.fillMaxWidth().defaultWeight())
+                if (index != items.lastIndex) {
+                    Spacer(modifier = GlanceModifier.height(8.dp))
                 }
             }
         }
     }
 
     @Composable
-    private fun ItemCard(item: PriceItem, palette: Palette, modifier: GlanceModifier) {
-        Box(
+    private fun RowCard(item: PriceItem, palette: Palette, modifier: GlanceModifier) {
+        Row(
             modifier = modifier
                 .background(palette.subCardBg)
                 .cornerRadius(16.dp)
-                .padding(10.dp)
+                .padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.Vertical.CenterVertically
         ) {
-            Column(modifier = GlanceModifier.fillMaxSize(), verticalAlignment = Alignment.Vertical.CenterVertically) {
-                Row(verticalAlignment = Alignment.Vertical.CenterVertically) {
-                    Badge(item, small = true)
-                    Spacer(modifier = GlanceModifier.width(6.dp))
-                    Text(
-                        item.displayName,
-                        style = TextStyle(color = ColorProvider(palette.textSecondary), fontSize = 11.sp, fontWeight = FontWeight.Medium)
-                    )
-                }
-                Spacer(modifier = GlanceModifier.height(6.dp))
+            Badge(item, small = true)
+            Spacer(modifier = GlanceModifier.width(8.dp))
+            Text(
+                item.displayName,
+                style = TextStyle(color = ColorProvider(palette.textPrimary), fontSize = 13.sp, fontWeight = FontWeight.Medium),
+                maxLines = 1,
+                modifier = GlanceModifier.defaultWeight()
+            )
+            Spacer(modifier = GlanceModifier.width(6.dp))
+            Column(horizontalAlignment = Alignment.Horizontal.End) {
                 ChangeText(item, fontSize = 10.sp)
                 Text(
                     item.priceValue?.let { "%,.0f".format(it) } ?: item.price ?: "--",
-                    style = TextStyle(color = ColorProvider(palette.textPrimary), fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    style = TextStyle(color = ColorProvider(palette.textPrimary), fontSize = 15.sp, fontWeight = FontWeight.Bold),
+                    maxLines = 1
                 )
             }
         }
