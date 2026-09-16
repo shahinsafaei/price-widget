@@ -3,6 +3,8 @@ name: Build APK
 on:
   push:
     branches: [ main, master ]
+    paths-ignore:
+      - 'data/**'
   workflow_dispatch: {}
 
 jobs:

@@ -14,7 +14,7 @@ object WorkScheduler {
         val constraints = androidx.work.Constraints.Builder()
             .setRequiredNetworkType(androidx.work.NetworkType.CONNECTED)
             .build()
-        val request = PeriodicWorkRequestBuilder<UpdateWorker>(1, TimeUnit.HOURS)
+        val request = PeriodicWorkRequestBuilder<UpdateWorker>(15, TimeUnit.MINUTES)
             .setConstraints(constraints)
             .build()
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(

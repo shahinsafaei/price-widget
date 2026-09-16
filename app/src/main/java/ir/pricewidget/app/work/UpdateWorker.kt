@@ -28,8 +28,7 @@ class UpdateWorker(
 
         return try {
             val repo = PrefsRepository(applicationContext)
-            val key = repo.getApiKeyOnce()
-            val response = ApiService.create().getGoldCurrency(key)
+            val response = ApiService.create().getGoldCurrency()
             val now = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
             repo.saveCache(response, now)
             PriceWidget().updateAll(applicationContext)
@@ -43,7 +42,7 @@ class UpdateWorker(
     private fun isWithinMarketHours(): Boolean {
         val tehran = Calendar.getInstance(TimeZone.getTimeZone("Asia/Tehran"))
         val hour = tehran.get(Calendar.HOUR_OF_DAY)
-        return hour in 11..16 // covers 11:00 up to just before 17:00
+        return hour in 9..19 // 9:00 up to just before 20:00
     }
 
     companion object {

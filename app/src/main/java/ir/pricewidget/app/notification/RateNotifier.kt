@@ -61,9 +61,11 @@ object RateNotifier {
                 val pct = item.changePercent
                 val changePart = if (pct != null) {
                     val arrow = if (pct >= 0) "▲" else "▼"
-                    "   $arrow ${"%.1f".format(kotlin.math.abs(pct))}%"
+                    "   $arrow${"%.1f".format(kotlin.math.abs(pct))}٪"
                 } else ""
-                "${item.displayName}:  $price$changePart"
+                // \u200F (RLM) forces right-to-left line layout so Persian labels
+                // and left-to-right numbers don't get visually scrambled.
+                "\u200F${item.displayName}:  \u200E$price\u200F$changePart"
             }
         }
 

@@ -8,6 +8,8 @@ object IconMap {
     /** Returns a drawable resource id for a real flag PNG, or null if none applies (gold/crypto). */
     fun flagDrawableRes(symbol: String?): Int? = when {
         symbol == null -> null
+        symbol.contains("XAU") -> null // gold ounce — not a currency flag
+        symbol.contains("GOLD") || symbol.contains("COIN") -> null
         symbol.contains("USD") && !symbol.contains("USDT") -> R.drawable.flag_us
         symbol.contains("EUR") -> R.drawable.flag_eu
         symbol.contains("GBP") -> R.drawable.flag_gb
@@ -40,6 +42,9 @@ object IconMap {
 
     fun flag(symbol: String?): String = when {
         symbol == null -> "💱"
+        symbol.contains("XAU") -> "🪙"
+        symbol.contains("GOLD") -> "🪙"
+        symbol.contains("COIN") -> "🪙"
         symbol.contains("USDT") -> "₮"
         symbol.contains("USD") -> "🇺🇸"
         symbol.contains("EUR") -> "🇪🇺"
@@ -68,14 +73,24 @@ object IconMap {
         symbol.contains("AMD") -> "🇦🇲"
         symbol.contains("GEL") -> "🇬🇪"
         symbol.contains("SYP") -> "🇸🇾"
-        symbol.contains("GOLD") -> "🪙"
-        symbol.contains("COIN") -> "🪙"
         symbol.contains("BTC") -> "₿"
         symbol.contains("ETH") -> "Ξ"
+        symbol.contains("USDC") -> "🪙"
         symbol.contains("XRP") -> "✕"
         symbol.contains("BNB") -> "🔶"
         symbol.contains("SOL") -> "◎"
+        symbol.contains("TRX") -> "🔺"
         symbol.contains("DOGE") -> "🐕"
+        symbol.contains("ADA") -> "🔷"
+        symbol.contains("LINK") -> "🔗"
+        symbol.contains("XLM") -> "✦"
+        symbol.contains("AVAX") -> "🔺"
+        symbol.contains("SHIB") -> "🐕"
+        symbol.contains("LTC") -> "Ł"
+        symbol.contains("DOT") -> "●"
+        symbol.contains("UNI") -> "🦄"
+        symbol.contains("ATOM") -> "⚛"
+        symbol.contains("FIL") -> "📁"
         else -> "💱"
     }
 

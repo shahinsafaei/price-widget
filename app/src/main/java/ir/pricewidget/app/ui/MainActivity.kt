@@ -158,9 +158,8 @@ fun AppScreen() {
     var limitMessage by remember { mutableStateOf<String?>(null) }
 
     suspend fun refresh() {
-        val apiKey = repo.getApiKeyOnce()
         try {
-            val result = ApiService.create().getGoldCurrency(apiKey)
+            val result = ApiService.create().getGoldCurrency()
             response = result
             val now = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date())
             repo.saveCache(result, now)

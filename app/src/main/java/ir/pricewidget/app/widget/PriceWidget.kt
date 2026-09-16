@@ -230,13 +230,18 @@ class PriceWidget : GlanceAppWidget() {
             }
         } else {
             val (label, color) = badgeFor(item.symbol)
+            val labelFontSize = when {
+                label.length <= 1 -> if (small) 10.sp else 13.sp
+                label.length <= 3 -> if (small) 7.sp else 9.sp
+                else -> if (small) 6.sp else 8.sp
+            }
             Box(
                 modifier = GlanceModifier.size(dim).background(color).cornerRadius(dim / 2),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     label,
-                    style = TextStyle(color = ColorProvider(Color.White), fontSize = if (small) 10.sp else 13.sp, fontWeight = FontWeight.Bold)
+                    style = TextStyle(color = ColorProvider(Color.White), fontSize = labelFontSize, fontWeight = FontWeight.Bold)
                 )
             }
         }
@@ -244,6 +249,9 @@ class PriceWidget : GlanceAppWidget() {
 
     private fun badgeFor(symbol: String?): Pair<String, Color> = when {
         symbol == null -> "?" to Color(0xFF8E8E93)
+        symbol.contains("XAU") -> "🪙" to Color(0xFFD4A017)
+        symbol.contains("GOLD") -> "🪙" to Color(0xFFD4A017)
+        symbol.contains("COIN") -> "🪙" to Color(0xFFD4A017)
         symbol.contains("USDT") -> "T" to Color(0xFF26A17B)
         symbol.contains("USD") -> "$" to Color(0xFF2E7D32)
         symbol.contains("EUR") -> "€" to Color(0xFF1565C0)
@@ -252,14 +260,24 @@ class PriceWidget : GlanceAppWidget() {
         symbol.contains("TRY") -> "₺" to Color(0xFFE30A17)
         symbol.contains("CNY") -> "¥" to Color(0xFFDE2910)
         symbol.contains("JPY") -> "¥" to Color(0xFFBC002D)
-        symbol.contains("GOLD") -> "🪙" to Color(0xFFD4A017)
-        symbol.contains("COIN") -> "🪙" to Color(0xFFD4A017)
         symbol.contains("BTC") -> "₿" to Color(0xFFF7931A)
         symbol.contains("ETH") -> "Ξ" to Color(0xFF627EEA)
-        symbol.contains("XRP") -> "X" to Color(0xFF23292F)
-        symbol.contains("BNB") -> "B" to Color(0xFFF3BA2F)
-        symbol.contains("SOL") -> "S" to Color(0xFF9945FF)
-        symbol.contains("DOGE") -> "D" to Color(0xFFC2A633)
+        symbol.contains("USDC") -> "USDC" to Color(0xFF2775CA)
+        symbol.contains("XRP") -> "XRP" to Color(0xFF23292F)
+        symbol.contains("BNB") -> "BNB" to Color(0xFFF3BA2F)
+        symbol.contains("SOL") -> "SOL" to Color(0xFF9945FF)
+        symbol.contains("TRX") -> "TRX" to Color(0xFFEF0027)
+        symbol.contains("DOGE") -> "DOGE" to Color(0xFFC2A633)
+        symbol.contains("ADA") -> "ADA" to Color(0xFF0033AD)
+        symbol.contains("LINK") -> "LINK" to Color(0xFF2A5ADA)
+        symbol.contains("XLM") -> "XLM" to Color(0xFF08B5E5)
+        symbol.contains("AVAX") -> "AVAX" to Color(0xFFE84142)
+        symbol.contains("SHIB") -> "SHIB" to Color(0xFFFFA409)
+        symbol.contains("LTC") -> "LTC" to Color(0xFF345D9D)
+        symbol.contains("DOT") -> "DOT" to Color(0xFFE6007A)
+        symbol.contains("UNI") -> "UNI" to Color(0xFFFF007A)
+        symbol.contains("ATOM") -> "ATOM" to Color(0xFF2E3148)
+        symbol.contains("FIL") -> "FIL" to Color(0xFF0090FF)
         else -> symbol.take(1) to Color(0xFF546E7A)
     }
 }
