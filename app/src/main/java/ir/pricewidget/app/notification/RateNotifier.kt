@@ -47,12 +47,23 @@ object RateNotifier {
             ?.filter { it.itemKey in selected }
             ?: emptyList()
 
-        val contentText = if (items.isEmpty()) {
-            "آیتمی انتخاب نشده — اپ رو باز کن"
+        val summaryLine = if (items.isEmpty()) {
+            "آیتمی انتخاب نشده"
         } else {
-            items.joinToString("   ·   ") { item ->
+            items.joinToString("  ·  ") { it.displayName }
+        }
+
+        val detailText = if (items.isEmpty()) {
+            "برای انتخاب نرخ‌ها، اپ رو باز کن"
+        } else {
+            items.joinToString("\n") { item ->
                 val price = item.priceValue?.let { "%,.0f".format(it) } ?: item.price ?: "--"
-                "${item.displayName}: $price"
+                val pct = item.changePercent
+                val changePart = if (pct != null) {
+                    val arrow = if (pct >= 0) "▲" else "▼"
+                    "   $arrow ${"%.1f".format(kotlin.math.abs(pct))}%"
+                } else ""
+                "${item.displayName}:  $price$changePart"
             }
         }
 
@@ -65,8 +76,8 @@ object RateNotifier {
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle("نرخ لحظه‌ای")
-            .setContentText(contentText)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(contentText))
+            .setContentText(summaryLine)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(detailText))
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
