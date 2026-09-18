@@ -53,7 +53,7 @@ jobs:
               "${base}?key=${BRSAPI_KEY}" || true)
             echo "HTTP status: $code"
             head -c 300 /tmp/rates.json; echo
-            if [ "$code" = "200" ] && jq -e '(.gold|type=="array") and (.currency|type=="array")' /tmp/rates.json > /dev/null 2>&1; then
+            if [ "$code" = "200" ] && jq -e '(.gold|type=="array") and (.currency|type=="array") and (.cryptocurrency|type=="array")' /tmp/rates.json > /dev/null 2>&1; then
               ok=1
               break
             fi
@@ -62,7 +62,19 @@ jobs:
             echo "::error::No valid response from brsapi (bad key, wrong URL, or the API blocks GitHub's foreign IPs). Old data/latest.json is kept."
             exit 1
           fi
-          jq -c . /tmp/rates.json > data/latest.json
+          # Write to a temp file first, then move into place so a crash can't leave a truncated file.
+          tmp_out=$(mktemp)
+          if ! jq -c . /tmp/rates.json > "$tmp_out"; then
+            echo "::error::jq failed to compact the fetched JSON. Keeping old data/latest.json."
+            rm -f "$tmp_out"
+            exit 1
+          fi
+          if [ ! -s "$tmp_out" ]; then
+            echo "::error::jq produced an empty output. Keeping old data/latest.json."
+            rm -f "$tmp_out"
+            exit 1
+          fi
+          mv "$tmp_out" data/latest.json
 
       - name: Commit and push if changed
         if: steps.hours.outputs.within == 'true'
