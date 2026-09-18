@@ -2,16 +2,20 @@ name: Fetch Rates
 
 on:
   schedule:
-    # Runs every 15 minutes, roughly 8:30–20:15 Tehran time (UTC+3:30).
+    # Every 15 minutes, 05:00-16:59 UTC (= 08:30-20:29 Tehran, UTC+3:30)
     - cron: '0,15,30,45 5-16 * * *'
   workflow_dispatch: {}
 
 permissions:
   contents: write
 
+concurrency:
+  group: fetch-rates
+  cancel-in-progress: false
+
 jobs:
   fetch:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -19,8 +23,9 @@ jobs:
         id: hours
         run: |
           hour=$(TZ='Asia/Tehran' date +%H)
+          hour=$((10#$hour))
           echo "Current Tehran hour: $hour"
-          if [ "$hour" -ge 9 ] && [ "$hour" -lt 20 ]; then
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || { [ "$hour" -ge 9 ] && [ "$hour" -lt 20 ]; }; then
             echo "within=true" >> "$GITHUB_OUTPUT"
           else
             echo "within=false" >> "$GITHUB_OUTPUT"
@@ -28,10 +33,36 @@ jobs:
 
       - name: Fetch latest rates
         if: steps.hours.outputs.within == 'true'
+        env:
+          BRSAPI_KEY: ${{ secrets.BRSAPI_KEY }}
         run: |
+          if [ -z "$BRSAPI_KEY" ]; then
+            echo "::error::Secret BRSAPI_KEY is empty. Add it in Settings > Secrets and variables > Actions."
+            exit 1
+          fi
           mkdir -p data
-          curl -sL "https://api.brsapi.ir/Market/Gold_Currency.php?key=${{ secrets.BRSAPI_KEY }}" -o data/latest.json
-          cat data/latest.json | head -c 100
+          ok=0
+          for base in \
+            "https://brsapi.ir/Api/Market/Gold_Currency.php" \
+            "https://api.brsapi.ir/Market/Gold_Currency.php"; do
+            echo "Trying: $base"
+            code=$(curl -sS -L --max-time 30 \
+              -A "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36" \
+              -H "Accept: application/json" \
+              -w '%{http_code}' -o /tmp/rates.json \
+              "${base}?key=${BRSAPI_KEY}" || true)
+            echo "HTTP status: $code"
+            head -c 300 /tmp/rates.json; echo
+            if [ "$code" = "200" ] && jq -e '(.gold|type=="array") and (.currency|type=="array")' /tmp/rates.json > /dev/null 2>&1; then
+              ok=1
+              break
+            fi
+          done
+          if [ "$ok" -ne 1 ]; then
+            echo "::error::No valid response from brsapi (bad key, wrong URL, or the API blocks GitHub's foreign IPs). Old data/latest.json is kept."
+            exit 1
+          fi
+          jq -c . /tmp/rates.json > data/latest.json
 
       - name: Commit and push if changed
         if: steps.hours.outputs.within == 'true'

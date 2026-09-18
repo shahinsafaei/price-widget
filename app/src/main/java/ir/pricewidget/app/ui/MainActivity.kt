@@ -336,7 +336,7 @@ fun AppScreen() {
                             featuredItem,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 16.dp, top = 12.dp)
+                                .padding(start = 16.dp, top = 12.dp, end = 16.dp)
                         )
                     }
                     LazyColumn(
@@ -470,14 +470,12 @@ fun AppScreen() {
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.clickable {
-                        val intent = try {
-                            android.content.Intent(
-                                android.content.Intent.ACTION_VIEW,
-                                android.net.Uri.parse("instagram://user?username=shahinsafaei")
-                            ).apply { setPackage("com.instagram.android") }
-                        } catch (e: Exception) { null }
+                        val appIntent = android.content.Intent(
+                            android.content.Intent.ACTION_VIEW,
+                            android.net.Uri.parse("instagram://user?username=shahinsafaei")
+                        ).apply { setPackage("com.instagram.android") }
                         try {
-                            context.startActivity(intent)
+                            context.startActivity(appIntent)
                         } catch (e: Exception) {
                             context.startActivity(
                                 android.content.Intent(

@@ -19,7 +19,7 @@ class UpdateWorker(
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
-        // Only refresh during Tehran market hours (11:00–17:00) to save API quota.
+        // Only refresh during Tehran market hours (09:00–20:00) to save API quota.
         // Manual refreshes from inside the app bypass this check.
         val isManual = inputData.getBoolean(KEY_MANUAL, false)
         if (!isManual && !isWithinMarketHours()) {
