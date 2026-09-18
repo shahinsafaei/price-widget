@@ -57,11 +57,11 @@ object RateNotifier {
             "برای انتخاب نرخ‌ها، اپ رو باز کن"
         } else {
             items.joinToString("\n") { item ->
-                val price = item.priceValue?.let { "%,.0f".format(it) } ?: item.price ?: "--"
+                val price = item.priceValue?.let { "%,.0f".format(java.util.Locale.US, it) } ?: item.price ?: "--"
                 val pct = item.changePercent
                 val changePart = if (pct != null) {
                     val arrow = if (pct >= 0) "▲" else "▼"
-                    "   $arrow${"%.1f".format(kotlin.math.abs(pct))}٪"
+                    "   $arrow${"%.1f".format(java.util.Locale.US, kotlin.math.abs(pct))}٪"
                 } else ""
                 // \u200F (RLM) forces right-to-left line layout so Persian labels
                 // and left-to-right numbers don't get visually scrambled.

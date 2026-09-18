@@ -40,6 +40,8 @@ import ir.pricewidget.app.widget.PriceWidget
 import ir.pricewidget.app.widget.PriceWidgetReceiver
 import ir.pricewidget.app.work.WorkScheduler
 import kotlinx.coroutines.launch
+import java.util.Locale
+
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -62,7 +64,10 @@ fun RollingNumberText(
     style: androidx.compose.ui.text.TextStyle,
     modifier: Modifier = Modifier
 ) {
-    Row(modifier = modifier) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.Start
+    ) {
         text.forEach { char ->
             AnimatedContent(
                 targetState = char,
@@ -72,7 +77,12 @@ fun RollingNumberText(
                 },
                 label = "digit"
             ) { c ->
-                Text(c.toString(), style = style)
+                Text(
+                    c.toString(),
+                    style = style.copy(
+                        textDirection = androidx.compose.ui.text.style.TextDirection.Ltr
+                    )
+                )
             }
         }
     }
@@ -127,7 +137,7 @@ fun FeaturedPriceCard(item: ir.pricewidget.app.data.PriceItem, modifier: Modifie
                 )
                 if (pct != null) {
                     Text(
-                        "${if (positive) "+" else ""}${"%.1f".format(pct)}%",
+                        "${if (positive) "+" else ""}${"%.1f".format(Locale.US, pct)}%",
                         style = MaterialTheme.typography.labelMedium,
                         color = trendColor
                     )
@@ -140,7 +150,7 @@ fun FeaturedPriceCard(item: ir.pricewidget.app.data.PriceItem, modifier: Modifie
         }
         Spacer(Modifier.height(10.dp))
         RollingNumberText(
-            text = item.priceValue?.let { "%,.0f".format(it) } ?: item.price ?: "--",
+            text = item.priceValue?.let { "%,.0f".format(Locale.US, it) } ?: item.price ?: "--",
             style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.Bold)
         )
     }
@@ -203,14 +213,14 @@ fun PriceCard(
         Spacer(Modifier.height(8.dp))
         if (pct != null) {
             Text(
-                "${if (positive) "+" else ""}${"%.1f".format(pct)}%",
+                "${if (positive) "+" else ""}${"%.1f".format(Locale.US, pct)}%",
                 style = MaterialTheme.typography.labelSmall,
                 color = if (positive) androidx.compose.ui.graphics.Color(0xFF32D74B)
                         else androidx.compose.ui.graphics.Color(0xFFFF453A)
             )
         }
         RollingNumberText(
-            text = priceItem.priceValue?.let { "%,.0f".format(it) } ?: priceItem.price ?: "--",
+            text = priceItem.priceValue?.let { "%,.0f".format(Locale.US, it) } ?: priceItem.price ?: "--",
             style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
         )
     }

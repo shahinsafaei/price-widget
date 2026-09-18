@@ -68,9 +68,9 @@ private val LARGE = DpSize(280.dp, 260.dp)
 private fun formatWidgetPrice(item: PriceItem): String {
     val v = item.priceValue ?: return item.price ?: "--"
     return if (v >= 1_000_000) {
-        "%,dm".format(Math.round(v / 1000.0))
+        "%,dm".format(java.util.Locale.US, Math.round(v / 1000.0))
     } else {
-        "%,.0f".format(v)
+        "%,.0f".format(java.util.Locale.US, v)
     }
 }
 
@@ -208,7 +208,7 @@ class PriceWidget : GlanceAppWidget() {
         val pct = item.changePercent ?: return
         val positive = pct >= 0
         Text(
-            "${if (positive) "▲" else "▼"} ${"%.1f".format(kotlin.math.abs(pct))}%",
+            "${if (positive) "▲" else "▼"} ${"%.1f".format(java.util.Locale.US, kotlin.math.abs(pct))}%",
             style = TextStyle(
                 color = ColorProvider(if (positive) Positive else Negative),
                 fontSize = fontSize,
