@@ -57,7 +57,7 @@ object RateNotifier {
             "برای انتخاب نرخ‌ها، اپ رو باز کن"
         } else {
             items.joinToString("\n") { item ->
-                val price = item.priceValue?.let { "%,.0f".format(java.util.Locale.US, it) } ?: item.price ?: "--"
+                val price = "\u2066" + (item.priceValue?.let { "%,.0f".format(java.util.Locale.US, it) } ?: item.price ?: "--") + "\u2069"
                 val pct = item.changePercent
                 val changePart = if (pct != null) {
                     val arrow = if (pct >= 0) "▲" else "▼"

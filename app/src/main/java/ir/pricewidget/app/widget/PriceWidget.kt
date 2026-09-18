@@ -65,13 +65,22 @@ private val Negative = Color(0xFFFF3B30)
 private val SMALL = DpSize(140.dp, 140.dp)
 private val LARGE = DpSize(280.dp, 260.dp)
 
+// Bug fix (v2.9.3): the widget's number string was being reordered by the
+// system's bidi algorithm when the device language is Persian (RTL), e.g.
+// "32,363,000" showed as "000,363,32". Wrapping the number in Unicode
+// "left-to-right isolate" marks (U+2066 ... U+2069) forces it to always
+// render left-to-right, independent of the surrounding RTL text/locale.
+private const val LRI = "\u2066"
+private const val PDI = "\u2069"
+
 private fun formatWidgetPrice(item: PriceItem): String {
     val v = item.priceValue ?: return item.price ?: "--"
-    return if (v >= 1_000_000) {
+    val raw = if (v >= 1_000_000) {
         "%,dm".format(java.util.Locale.US, Math.round(v / 1000.0))
     } else {
         "%,.0f".format(java.util.Locale.US, v)
     }
+    return "$LRI$raw$PDI"
 }
 
 class PriceWidget : GlanceAppWidget() {

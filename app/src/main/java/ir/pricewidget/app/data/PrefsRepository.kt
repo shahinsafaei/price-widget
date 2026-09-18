@@ -20,7 +20,16 @@ class PrefsRepository(private val context: Context) {
         val LAST_UPDATED = stringPreferencesKey("last_updated")
         val WIDGET_DARK = androidx.datastore.preferences.core.booleanPreferencesKey("widget_dark")
         val NOTIF_ENABLED = androidx.datastore.preferences.core.booleanPreferencesKey("notif_enabled")
+        val ONBOARDED = androidx.datastore.preferences.core.booleanPreferencesKey("onboarded")
     }
+
+    val onboardedFlow: Flow<Boolean> = context.dataStore.data.map { it[Keys.ONBOARDED] ?: false }
+
+    suspend fun setOnboarded(done: Boolean) {
+        context.dataStore.edit { it[Keys.ONBOARDED] = done }
+    }
+
+    suspend fun isOnboardedOnce(): Boolean = onboardedFlow.first()
 
     val selectedItemsFlow: Flow<Set<String>> = context.dataStore.data.map {
         it[Keys.SELECTED_ITEMS] ?: emptySet()

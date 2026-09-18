@@ -64,25 +64,35 @@ fun RollingNumberText(
     style: androidx.compose.ui.text.TextStyle,
     modifier: Modifier = Modifier
 ) {
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.Start
+    // Bug fix (v2.9.3): when the device language is Persian, the overall layout
+    // direction becomes RTL. Since this Row lays out one Text per digit/comma,
+    // an RTL layout direction reverses the order of those children — so
+    // "32,363,000" was rendered as "000,363,32". Numbers must always read
+    // left-to-right regardless of system language, so we pin this Row (and
+    // everything inside it) to LTR explicitly.
+    androidx.compose.runtime.CompositionLocalProvider(
+        androidx.compose.ui.platform.LocalLayoutDirection provides androidx.compose.ui.unit.LayoutDirection.Ltr
     ) {
-        text.forEach { char ->
-            AnimatedContent(
-                targetState = char,
-                transitionSpec = {
-                    (slideInVertically(animationSpec = tween(320)) { h -> h } )
-                        .togetherWith(slideOutVertically(animationSpec = tween(320)) { h -> -h })
-                },
-                label = "digit"
-            ) { c ->
-                Text(
-                    c.toString(),
-                    style = style.copy(
-                        textDirection = androidx.compose.ui.text.style.TextDirection.Ltr
+        Row(
+            modifier = modifier,
+            horizontalArrangement = Arrangement.Start
+        ) {
+            text.forEach { char ->
+                AnimatedContent(
+                    targetState = char,
+                    transitionSpec = {
+                        (slideInVertically(animationSpec = tween(320)) { h -> h } )
+                            .togetherWith(slideOutVertically(animationSpec = tween(320)) { h -> -h })
+                    },
+                    label = "digit"
+                ) { c ->
+                    Text(
+                        c.toString(),
+                        style = style.copy(
+                            textDirection = androidx.compose.ui.text.style.TextDirection.Ltr
+                        )
                     )
-                )
+                }
             }
         }
     }
@@ -109,6 +119,45 @@ fun SegmentedThemeToggle(isDark: Boolean, onChange: (Boolean) -> Unit) {
             )
         }
     }
+}
+
+@Composable
+fun LazyRowCategoryChips(
+    categories: List<String>,
+    selected: String?,
+    onSelect: (String?) -> Unit
+) {
+    androidx.compose.foundation.lazy.LazyRow(
+        contentPadding = PaddingValues(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.padding(top = 10.dp, bottom = 6.dp)
+    ) {
+        item {
+            CategoryChip(label = "همه", isSelected = selected == null, onClick = { onSelect(null) })
+        }
+        items(categories) { category ->
+            CategoryChip(label = category, isSelected = selected == category, onClick = { onSelect(category) })
+        }
+    }
+}
+
+@Composable
+private fun CategoryChip(label: String, isSelected: Boolean, onClick: () -> Unit) {
+    Text(
+        label,
+        style = MaterialTheme.typography.labelMedium,
+        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+        modifier = Modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface)
+            .border(
+                width = 1.dp,
+                color = if (isSelected) androidx.compose.ui.graphics.Color.Transparent else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f),
+                shape = RoundedCornerShape(20.dp)
+            )
+            .clickable { onClick() }
+            .padding(horizontal = 14.dp, vertical = 7.dp)
+    )
 }
 
 @Composable
@@ -226,11 +275,17 @@ fun PriceCard(
     }
 }
 
+private fun isMarketOpenNow(): Boolean {
+    val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+    return hour in 9 until 20
+}
+
 @Composable
 fun AppScreen() {
     val context = androidx.compose.ui.platform.LocalContext.current
     val repo = remember { PrefsRepository(context) }
     val scope = rememberCoroutineScope()
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
 
     var selected by remember { mutableStateOf<Set<String>>(emptySet()) }
     var response by remember { mutableStateOf<GoldCurrencyResponse?>(null) }
@@ -243,9 +298,13 @@ fun AppScreen() {
     var isDark by remember { mutableStateOf(false) }
     var notifEnabled by remember { mutableStateOf(false) }
     var limitMessage by remember { mutableStateOf<String?>(null) }
+    var selectedCategory by remember { mutableStateOf<String?>(null) }
+    var showOnboarding by remember { mutableStateOf(false) }
+    val marketOpen = remember { isMarketOpenNow() }
 
-    suspend fun refresh() {
+    suspend fun refresh(hapticOnChange: Boolean = false) {
         try {
+            val previousPrices = response?.allItems()?.associate { it.second.itemKey to it.second.price }
             val result = ApiService.create().getGoldCurrency()
             response = result
             val now = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date())
@@ -253,6 +312,10 @@ fun AppScreen() {
             lastUpdated = now
             error = null
             PriceWidget().updateAll(context)
+            if (hapticOnChange && previousPrices != null) {
+                val changed = result.allItems().any { (_, item) -> previousPrices[item.itemKey] != null && previousPrices[item.itemKey] != item.price }
+                if (changed) haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+            }
         } catch (e: Exception) {
             response = repo.getCachedOnce()
             error = "اتصال برقرار نشد — آخرین دادهٔ ذخیره‌شده نمایش داده می‌شود"
@@ -266,6 +329,9 @@ fun AppScreen() {
         refresh()
         if (notifEnabled) ir.pricewidget.app.notification.RateNotifier.show(context)
         loading = false
+        if (!repo.isOnboardedOnce() && selected.isEmpty()) {
+            showOnboarding = true
+        }
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -280,10 +346,26 @@ fun AppScreen() {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text(
-                    stringResource(R.string.app_name),
-                    style = MaterialTheme.typography.headlineMedium
-                )
+                Column {
+                    Text(
+                        stringResource(R.string.app_name),
+                        style = MaterialTheme.typography.headlineMedium
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 2.dp)) {
+                        Box(
+                            modifier = Modifier
+                                .size(7.dp)
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(if (marketOpen) androidx.compose.ui.graphics.Color(0xFF32D74B) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f))
+                        )
+                        Spacer(Modifier.width(5.dp))
+                        Text(
+                            if (marketOpen) "بازار باز است" else "بازار بسته — آخرین قیمت",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        )
+                    }
+                }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         lastUpdated?.let { "بروزرسانی: $it" } ?: "",
@@ -295,7 +377,7 @@ fun AppScreen() {
                         onClick = {
                             scope.launch {
                                 refreshing = true
-                                refresh()
+                                refresh(hapticOnChange = true)
                                 refreshing = false
                             }
                         },
@@ -312,12 +394,26 @@ fun AppScreen() {
         }
 
         error?.let {
-            Text(
-                it,
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp)
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(MaterialTheme.colorScheme.error.copy(alpha = 0.1f))
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                    Text("⚠️", modifier = Modifier.padding(end = 8.dp))
+                    Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                }
+                TextButton(onClick = {
+                    scope.launch { refreshing = true; refresh(); refreshing = false }
+                }) {
+                    Text("تلاش دوباره", style = MaterialTheme.typography.labelMedium)
+                }
+            }
         }
         limitMessage?.let {
             Text(
@@ -336,10 +432,29 @@ fun AppScreen() {
             val allItems = response?.allItems() ?: emptyList()
             if (allItems.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("دیتایی دریافت نشد. اتصال اینترنت رو چک کن.")
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("📡", style = MaterialTheme.typography.displayMedium)
+                        Spacer(Modifier.height(10.dp))
+                        Text(
+                            "دیتایی دریافت نشد",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "اتصال اینترنت رو چک کن و دوباره تلاش کن",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        )
+                        Spacer(Modifier.height(14.dp))
+                        Button(onClick = { scope.launch { refreshing = true; refresh(); refreshing = false } }) {
+                            Text("تلاش دوباره")
+                        }
+                    }
                 }
             } else {
                 val featuredItem = allItems.map { it.second }.firstOrNull { it.itemKey in selected }
+                val categories = allItems.map { it.first }.distinct()
                 Column(modifier = Modifier.weight(1f).fillMaxWidth()) {
                     if (featuredItem != null) {
                         FeaturedPriceCard(
@@ -349,12 +464,21 @@ fun AppScreen() {
                                 .padding(start = 16.dp, top = 12.dp, end = 16.dp)
                         )
                     }
+                    if (categories.size > 1) {
+                        LazyRowCategoryChips(
+                            categories = categories,
+                            selected = selectedCategory,
+                            onSelect = { selectedCategory = it }
+                        )
+                    }
                     LazyColumn(
                     modifier = Modifier.weight(1f).fillMaxWidth(),
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    val grouped = allItems.groupBy { it.first }
+                    val grouped = allItems
+                        .filter { selectedCategory == null || it.first == selectedCategory }
+                        .groupBy { it.first }
                     grouped.forEach { (category, categoryItems) ->
                         item {
                             val icon = when (category) {
@@ -498,6 +622,25 @@ fun AppScreen() {
                 )
             }
         }
+    }
+
+    if (showOnboarding) {
+        AlertDialog(
+            onDismissRequest = { showOnboarding = false; scope.launch { repo.setOnboarded(true) } },
+            title = { Text("خوش اومدی 👋") },
+            text = {
+                Text(
+                    "از بین آیتم‌های زیر، حداکثر ۳ مورد رو انتخاب کن تا روی ویجت صفحه اصلی گوشیت نمایش داده بشن. هر وقت خواستی می‌تونی از همین صفحه تغییرشون بدی.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showOnboarding = false
+                    scope.launch { repo.setOnboarded(true) }
+                }) { Text("باشه، متوجه شدم") }
+            }
+        )
     }
 
     if (showWidgetDialog) {
