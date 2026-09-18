@@ -15,13 +15,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Check Tehran market hours
+        id: hours
+        run: |
+          hour=$(TZ='Asia/Tehran' date +%H)
+          echo "Current Tehran hour: $hour"
+          if [ "$hour" -ge 9 ] && [ "$hour" -lt 20 ]; then
+            echo "within=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "within=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Fetch latest rates
+        if: steps.hours.outputs.within == 'true'
         run: |
           mkdir -p data
           curl -sL "https://api.brsapi.ir/Market/Gold_Currency.php?key=${{ secrets.BRSAPI_KEY }}" -o data/latest.json
           cat data/latest.json | head -c 100
 
       - name: Commit and push if changed
+        if: steps.hours.outputs.within == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
