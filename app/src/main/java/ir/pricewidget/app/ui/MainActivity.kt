@@ -6,6 +6,11 @@ import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -21,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -51,6 +57,28 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
+fun RollingNumberText(
+    text: String,
+    style: androidx.compose.ui.text.TextStyle,
+    modifier: Modifier = Modifier
+) {
+    Row(modifier = modifier) {
+        text.forEach { char ->
+            AnimatedContent(
+                targetState = char,
+                transitionSpec = {
+                    (slideInVertically(animationSpec = tween(320)) { h -> h } )
+                        .togetherWith(slideOutVertically(animationSpec = tween(320)) { h -> -h })
+                },
+                label = "digit"
+            ) { c ->
+                Text(c.toString(), style = style)
+            }
+        }
+    }
+}
+
+@Composable
 fun SegmentedThemeToggle(isDark: Boolean, onChange: (Boolean) -> Unit) {
     Row(
         modifier = Modifier
@@ -74,6 +102,51 @@ fun SegmentedThemeToggle(isDark: Boolean, onChange: (Boolean) -> Unit) {
 }
 
 @Composable
+fun FeaturedPriceCard(item: ir.pricewidget.app.data.PriceItem, modifier: Modifier = Modifier) {
+    val pct = item.changePercent
+    val positive = (pct ?: 0.0) >= 0
+    val trendColor = if (positive) androidx.compose.ui.graphics.Color(0xFF32D74B) else androidx.compose.ui.graphics.Color(0xFFFF453A)
+    Column(
+        modifier = modifier
+            .shadow(6.dp, RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(20.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .background(trendColor.copy(alpha = 0.08f))
+            .padding(18.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    item.displayName,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                if (pct != null) {
+                    Text(
+                        "${if (positive) "+" else ""}${"%.1f".format(pct)}%",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = trendColor
+                    )
+                }
+            }
+            Text(
+                ir.pricewidget.app.data.IconMap.flag(item.symbol),
+                style = MaterialTheme.typography.headlineMedium
+            )
+        }
+        Spacer(Modifier.height(10.dp))
+        RollingNumberText(
+            text = item.priceValue?.let { "%,.0f".format(it) } ?: item.price ?: "--",
+            style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.Bold)
+        )
+    }
+}
+
+@Composable
 fun PriceCard(
     priceItem: ir.pricewidget.app.data.PriceItem,
     checked: Boolean,
@@ -83,11 +156,16 @@ fun PriceCard(
 ) {
     val pct = priceItem.changePercent
     val positive = (pct ?: 0.0) >= 0
+    val trendTint = if (pct == null) MaterialTheme.colorScheme.surface
+        else if (positive) androidx.compose.ui.graphics.Color(0xFF32D74B).copy(alpha = 0.07f)
+        else androidx.compose.ui.graphics.Color(0xFFFF453A).copy(alpha = 0.07f)
     Column(
         modifier = modifier
             .alpha(if (enabled || checked) 1f else 0.35f)
+            .shadow(if (checked) 4.dp else 1.dp, RoundedCornerShape(16.dp))
             .clip(RoundedCornerShape(16.dp))
             .background(MaterialTheme.colorScheme.surface)
+            .background(trendTint)
             .then(
                 if (checked) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(16.dp))
                 else Modifier.border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f), RoundedCornerShape(16.dp))
@@ -131,10 +209,9 @@ fun PriceCard(
                         else androidx.compose.ui.graphics.Color(0xFFFF453A)
             )
         }
-        Text(
-            priceItem.priceValue?.let { "%,.0f".format(it) } ?: priceItem.price ?: "--",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold
+        RollingNumberText(
+            text = priceItem.priceValue?.let { "%,.0f".format(it) } ?: priceItem.price ?: "--",
+            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
         )
     }
 }
@@ -252,7 +329,17 @@ fun AppScreen() {
                     Text("دیتایی دریافت نشد. اتصال اینترنت رو چک کن.")
                 }
             } else {
-                LazyColumn(
+                val featuredItem = allItems.map { it.second }.firstOrNull { it.itemKey in selected }
+                Column(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                    if (featuredItem != null) {
+                        FeaturedPriceCard(
+                            featuredItem,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, top = 12.dp)
+                        )
+                    }
+                    LazyColumn(
                     modifier = Modifier.weight(1f).fillMaxWidth(),
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -260,8 +347,14 @@ fun AppScreen() {
                     val grouped = allItems.groupBy { it.first }
                     grouped.forEach { (category, categoryItems) ->
                         item {
+                            val icon = when (category) {
+                                "طلا و سکه" -> "🪙"
+                                "ارز" -> "💵"
+                                "ارز دیجیتال" -> "₿"
+                                else -> "📊"
+                            }
                             Text(
-                                category,
+                                "$icon $category",
                                 style = MaterialTheme.typography.labelLarge,
                                 color = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.padding(top = 14.dp, bottom = 6.dp, start = 4.dp)
@@ -302,6 +395,7 @@ fun AppScreen() {
                         }
                     }
                     item { Spacer(Modifier.height(8.dp)) }
+                }
                 }
             }
         }

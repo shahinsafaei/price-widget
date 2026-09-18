@@ -116,10 +116,14 @@ class PriceWidget : GlanceAppWidget() {
     @Composable
     private fun EmptyState(palette: Palette) {
         Box(modifier = GlanceModifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text(
-                "آیتمی انتخاب نشده\nاپ رو باز کن",
-                style = TextStyle(color = ColorProvider(palette.textSecondary), fontSize = 12.sp, textAlign = TextAlign.Center)
-            )
+            Column(horizontalAlignment = Alignment.Horizontal.CenterHorizontally) {
+                Text("📊", style = TextStyle(fontSize = 22.sp))
+                Spacer(modifier = GlanceModifier.height(4.dp))
+                Text(
+                    "آیتمی انتخاب نشده\nاپ رو باز کن",
+                    style = TextStyle(color = ColorProvider(palette.textSecondary), fontSize = 12.sp, textAlign = TextAlign.Center)
+                )
+            }
         }
     }
 

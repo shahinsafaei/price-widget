@@ -11,8 +11,8 @@ android {
         applicationId = "ir.pricewidget.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 5
-        versionName = "2.5"
+        versionCode = 6
+        versionName = "2.8"
     }
 
     buildTypes {
@@ -51,6 +51,7 @@ dependencies {
     // Compose
     implementation(platform("androidx.compose:compose-bom:2024.06.00"))
     implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.animation:animation")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
