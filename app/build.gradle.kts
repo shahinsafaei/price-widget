@@ -11,8 +11,8 @@ android {
         applicationId = "ir.pricewidget.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 8
-        versionName = "2.9.3"
+        versionCode = 9
+        versionName = "2.9.5"
     }
 
     buildTypes {

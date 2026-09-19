@@ -21,7 +21,20 @@ class PrefsRepository(private val context: Context) {
         val WIDGET_DARK = androidx.datastore.preferences.core.booleanPreferencesKey("widget_dark")
         val NOTIF_ENABLED = androidx.datastore.preferences.core.booleanPreferencesKey("notif_enabled")
         val ONBOARDED = androidx.datastore.preferences.core.booleanPreferencesKey("onboarded")
+        val HOME_ITEMS = stringSetPreferencesKey("home_items")
     }
+
+    // Home-screen watchlist — separate from widget selection (SELECTED_ITEMS below).
+    // No hard cap: the home grid just adds a row for every extra item.
+    val homeItemsFlow: Flow<Set<String>> = context.dataStore.data.map {
+        it[Keys.HOME_ITEMS] ?: emptySet()
+    }
+
+    suspend fun setHomeItems(keys: Set<String>) {
+        context.dataStore.edit { it[Keys.HOME_ITEMS] = keys }
+    }
+
+    suspend fun getHomeItemsOnce(): Set<String> = homeItemsFlow.first()
 
     val onboardedFlow: Flow<Boolean> = context.dataStore.data.map { it[Keys.ONBOARDED] ?: false }
 
