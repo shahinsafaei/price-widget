@@ -449,7 +449,7 @@ fun ManageItemsDialog(
                     "ستاره: نمایش در صفحه اصلی  ·  تیک: نمایش در ویجت (حداکثر ۳ مورد)",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                    modifier = Modifier.padding(horizontal = 20.dp, bottom = 8.dp)
+                    modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 8.dp)
                 )
                 limitMessage?.let {
                     Text(
