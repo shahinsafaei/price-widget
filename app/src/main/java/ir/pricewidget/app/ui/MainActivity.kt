@@ -25,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -168,7 +169,11 @@ private fun CategoryChip(label: String, isSelected: Boolean, onClick: () -> Unit
 }
 
 @Composable
-fun FeaturedPriceCard(item: ir.pricewidget.app.data.PriceItem, modifier: Modifier = Modifier) {
+fun FeaturedPriceCard(
+    item: ir.pricewidget.app.data.PriceItem,
+    modifier: Modifier = Modifier,
+    onRemove: (() -> Unit)? = null
+) {
     val pct = item.changePercent
     val positive = (pct ?: 0.0) >= 0
     val trendColor = if (positive) androidx.compose.ui.graphics.Color(0xFF32D74B) else androidx.compose.ui.graphics.Color(0xFFFF453A)
@@ -199,10 +204,25 @@ fun FeaturedPriceCard(item: ir.pricewidget.app.data.PriceItem, modifier: Modifie
                     )
                 }
             }
-            Text(
-                ir.pricewidget.app.data.IconMap.flag(item.symbol),
-                style = MaterialTheme.typography.headlineMedium
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    ir.pricewidget.app.data.IconMap.flag(item.symbol),
+                    style = MaterialTheme.typography.headlineMedium
+                )
+                if (onRemove != null) {
+                    Spacer(Modifier.width(10.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(RoundedCornerShape(9.dp))
+                            .background(MaterialTheme.colorScheme.background.copy(alpha = 0.6f))
+                            .clickable { onRemove() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("★", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleMedium)
+                    }
+                }
+            }
         }
         Spacer(Modifier.height(10.dp))
         RollingNumberText(
@@ -313,25 +333,57 @@ fun DailySummaryLine(items: List<ir.pricewidget.app.data.PriceItem>) {
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun HomeFeaturedPager(items: List<ir.pricewidget.app.data.PriceItem>) {
+fun HomeFeaturedPager(
+    items: List<ir.pricewidget.app.data.PriceItem>,
+    onRemove: (String) -> Unit
+) {
     if (items.isEmpty()) return
     val pagerState = rememberPagerState(pageCount = { items.size })
-    Column {
+    val currentPage = pagerState.currentPage.coerceIn(0, items.size - 1)
+    val offsetFraction = pagerState.currentPageOffsetFraction
+    val neighborPage = when {
+        offsetFraction > 0f -> (currentPage + 1).coerceAtMost(items.size - 1)
+        offsetFraction < 0f -> (currentPage - 1).coerceAtLeast(0)
+        else -> currentPage
+    }
+
+    fun trendColorOf(item: ir.pricewidget.app.data.PriceItem): androidx.compose.ui.graphics.Color {
+        val positive = (item.changePercent ?: 0.0) >= 0
+        return if (positive) androidx.compose.ui.graphics.Color(0xFF32D74B) else androidx.compose.ui.graphics.Color(0xFFFF453A)
+    }
+
+    val progress = kotlin.math.abs(offsetFraction).coerceIn(0f, 1f)
+    val ambientColor = androidx.compose.ui.graphics.lerp(
+        trendColorOf(items[currentPage]),
+        trendColorOf(items[neighborPage]),
+        progress
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(ambientColor.copy(alpha = 0.05f))
+    ) {
         HorizontalPager(
             state = pagerState,
             modifier = Modifier.fillMaxWidth(),
-            contentPadding = PaddingValues(horizontal = 16.dp),
-            pageSpacing = 10.dp
+            contentPadding = PaddingValues(horizontal = 36.dp),
+            pageSpacing = 12.dp
         ) { page ->
-            FeaturedPriceCard(items[page], modifier = Modifier.fillMaxWidth())
+            FeaturedPriceCard(
+                items[page],
+                modifier = Modifier.fillMaxWidth(),
+                onRemove = { onRemove(items[page].itemKey) }
+            )
         }
         if (items.size > 1) {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 2.dp),
-                horizontalArrangement = Arrangement.Center
+                modifier = Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 4.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 repeat(items.size) { index ->
-                    val active = pagerState.currentPage == index
+                    val active = currentPage == index
                     Box(
                         modifier = Modifier
                             .padding(horizontal = 3.dp)
@@ -343,6 +395,12 @@ fun HomeFeaturedPager(items: List<ir.pricewidget.app.data.PriceItem>) {
                             )
                     )
                 }
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "${currentPage + 1} / ${items.size}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                )
             }
         }
     }
@@ -352,6 +410,10 @@ fun HomeFeaturedPager(items: List<ir.pricewidget.app.data.PriceItem>) {
 fun HomeGridCard(
     priceItem: ir.pricewidget.app.data.PriceItem,
     modifier: Modifier = Modifier,
+    canMoveEarlier: Boolean,
+    canMoveLater: Boolean,
+    onMoveEarlier: () -> Unit,
+    onMoveLater: () -> Unit,
     onRemove: () -> Unit
 ) {
     val pct = priceItem.changePercent
@@ -411,20 +473,57 @@ fun HomeGridCard(
             text = priceItem.priceValue?.let { "%,.0f".format(Locale.US, it) } ?: priceItem.price ?: "--",
             style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold)
         )
+        Spacer(Modifier.height(8.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(22.dp)
+                    .alpha(if (canMoveEarlier) 1f else 0.25f)
+                    .clip(RoundedCornerShape(6.dp))
+                    .clickable(enabled = canMoveEarlier) { onMoveEarlier() },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    "‹",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .size(22.dp)
+                    .alpha(if (canMoveLater) 1f else 0.25f)
+                    .clip(RoundedCornerShape(6.dp))
+                    .clickable(enabled = canMoveLater) { onMoveLater() },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    "›",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                )
+            }
+        }
     }
 }
 
 @Composable
 fun ManageItemsDialog(
     allItems: List<Pair<String, ir.pricewidget.app.data.PriceItem>>,
-    homeItems: Set<String>,
+    homeItems: List<String>,
     widgetItems: Set<String>,
     limitMessage: String?,
     onToggleHome: (String, Boolean) -> Unit,
     onToggleWidget: (String, Boolean) -> Unit,
     onDismiss: () -> Unit
 ) {
+    var selectedTab by remember { mutableStateOf(0) }
     var selectedCategory by remember { mutableStateOf<String?>(null) }
+    var query by remember { mutableStateOf("") }
     val categories = allItems.map { it.first }.distinct()
 
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
@@ -445,12 +544,31 @@ fun ManageItemsDialog(
                         Icon(Icons.Filled.Close, contentDescription = "بستن")
                     }
                 }
-                Text(
-                    "ستاره: نمایش در صفحه اصلی  ·  تیک: نمایش در ویجت (حداکثر ۳ مورد)",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                    modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 8.dp)
+
+                TabRow(selectedTabIndex = selectedTab) {
+                    Tab(
+                        selected = selectedTab == 0,
+                        onClick = { selectedTab = 0 },
+                        text = { Text("صفحه اصلی (${homeItems.size})") }
+                    )
+                    Tab(
+                        selected = selectedTab == 1,
+                        onClick = { selectedTab = 1 },
+                        text = { Text("ویجت (${widgetItems.size}/۳)") }
+                    )
+                }
+
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    placeholder = { Text("جستجو…") },
+                    singleLine = true,
+                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 10.dp)
                 )
+
                 limitMessage?.let {
                     Text(
                         it,
@@ -459,6 +577,7 @@ fun ManageItemsDialog(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp)
                     )
                 }
+
                 if (categories.size > 1) {
                     LazyRowCategoryChips(
                         categories = categories,
@@ -466,6 +585,7 @@ fun ManageItemsDialog(
                         onSelect = { selectedCategory = it }
                     )
                 }
+
                 LazyColumn(
                     modifier = Modifier.weight(1f).fillMaxWidth(),
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
@@ -473,6 +593,7 @@ fun ManageItemsDialog(
                 ) {
                     val grouped = allItems
                         .filter { selectedCategory == null || it.first == selectedCategory }
+                        .filter { query.isBlank() || it.second.displayName.contains(query, ignoreCase = true) }
                         .groupBy { it.first }
                     grouped.forEach { (category, categoryItems) ->
                         item {
@@ -490,14 +611,22 @@ fun ManageItemsDialog(
                             )
                         }
                         items(categoryItems) { (_, priceItem) ->
-                            ManageItemRow(
-                                priceItem = priceItem,
-                                inHome = priceItem.itemKey in homeItems,
-                                inWidget = priceItem.itemKey in widgetItems,
-                                widgetEnabled = widgetItems.size < 3 || priceItem.itemKey in widgetItems,
-                                onToggleHome = { checked -> onToggleHome(priceItem.itemKey, checked) },
-                                onToggleWidget = { checked -> onToggleWidget(priceItem.itemKey, checked) }
-                            )
+                            if (selectedTab == 0) {
+                                ManageItemRow(
+                                    priceItem = priceItem,
+                                    checked = priceItem.itemKey in homeItems,
+                                    enabled = true,
+                                    onToggle = { checked -> onToggleHome(priceItem.itemKey, checked) }
+                                )
+                            } else {
+                                val inWidget = priceItem.itemKey in widgetItems
+                                ManageItemRow(
+                                    priceItem = priceItem,
+                                    checked = inWidget,
+                                    enabled = widgetItems.size < 3 || inWidget,
+                                    onToggle = { checked -> onToggleWidget(priceItem.itemKey, checked) }
+                                )
+                            }
                         }
                     }
                     item { Spacer(Modifier.height(12.dp)) }
@@ -510,18 +639,17 @@ fun ManageItemsDialog(
 @Composable
 private fun ManageItemRow(
     priceItem: ir.pricewidget.app.data.PriceItem,
-    inHome: Boolean,
-    inWidget: Boolean,
-    widgetEnabled: Boolean,
-    onToggleHome: (Boolean) -> Unit,
-    onToggleWidget: (Boolean) -> Unit
+    checked: Boolean,
+    enabled: Boolean,
+    onToggle: (Boolean) -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .alpha(if (enabled) 1f else 0.4f)
             .clip(RoundedCornerShape(14.dp))
             .background(MaterialTheme.colorScheme.surface)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .padding(horizontal = 12.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
@@ -537,30 +665,11 @@ private fun ManageItemRow(
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
             )
         }
-        Box(
-            modifier = Modifier
-                .size(30.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(if (inHome) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else androidx.compose.ui.graphics.Color.Transparent)
-                .clickable { onToggleHome(!inHome) },
-            contentAlignment = Alignment.Center
-        ) {
-            Text(if (inHome) "★" else "☆", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleMedium)
-        }
-        Spacer(Modifier.width(6.dp))
-        Box(
-            modifier = Modifier
-                .size(24.dp)
-                .alpha(if (widgetEnabled) 1f else 0.3f)
-                .clip(RoundedCornerShape(6.dp))
-                .background(if (inWidget) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
-                .clickable(enabled = widgetEnabled) { onToggleWidget(!inWidget) },
-            contentAlignment = Alignment.Center
-        ) {
-            if (inWidget) {
-                Text("✓", color = MaterialTheme.colorScheme.onPrimary, style = MaterialTheme.typography.labelSmall)
-            }
-        }
+        Switch(
+            checked = checked,
+            enabled = enabled,
+            onCheckedChange = onToggle
+        )
     }
 }
 
@@ -570,13 +679,12 @@ private fun isMarketOpenNow(): Boolean {
 }
 
 /** Default watchlist for first-time users: dollar, euro, 18k gold, bitcoin. */
-private val DEFAULT_HOME_SYMBOLS = setOf("USD", "EUR", "IR_GOLD_18K", "BTC")
+private val DEFAULT_HOME_SYMBOLS = listOf("USD", "EUR", "IR_GOLD_18K", "BTC")
 
-private fun defaultHomeKeys(allItems: List<Pair<String, ir.pricewidget.app.data.PriceItem>>): Set<String> =
-    allItems.map { it.second }
-        .filter { it.symbol in DEFAULT_HOME_SYMBOLS }
-        .map { it.itemKey }
-        .toSet()
+private fun defaultHomeKeys(allItems: List<Pair<String, ir.pricewidget.app.data.PriceItem>>): List<String> {
+    val bySymbol = allItems.map { it.second }.associateBy { it.symbol }
+    return DEFAULT_HOME_SYMBOLS.mapNotNull { bySymbol[it]?.itemKey }
+}
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -587,7 +695,7 @@ fun AppScreen() {
     val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
 
     var selected by remember { mutableStateOf<Set<String>>(emptySet()) } // widget items (max 3)
-    var homeItems by remember { mutableStateOf<Set<String>>(emptySet()) } // home screen watchlist
+    var homeItems by remember { mutableStateOf<List<String>>(emptyList()) } // home screen watchlist, ordered
     var response by remember { mutableStateOf<GoldCurrencyResponse?>(null) }
     var loading by remember { mutableStateOf(true) }
     var refreshing by remember { mutableStateOf(false) }
@@ -620,6 +728,18 @@ fun AppScreen() {
             response = repo.getCachedOnce()
             error = "اتصال برقرار نشد — آخرین دادهٔ ذخیره‌شده نمایش داده می‌شود"
         }
+    }
+
+    fun moveHomeItem(key: String, delta: Int) {
+        val idx = homeItems.indexOf(key)
+        if (idx < 0) return
+        val newIdx = (idx + delta).coerceIn(0, homeItems.size - 1)
+        if (newIdx == idx) return
+        val mutable = homeItems.toMutableList()
+        val moved = mutable.removeAt(idx)
+        mutable.add(newIdx, moved)
+        homeItems = mutable
+        scope.launch { repo.setHomeItems(homeItems) }
     }
 
     LaunchedEffect(Unit) {
@@ -763,7 +883,8 @@ fun AppScreen() {
                     }
                 }
             } else {
-                val homeList = allItems.map { it.second }.filter { it.itemKey in homeItems }
+                val allItemsFlat = allItems.map { it.second }
+                val homeList = homeItems.mapNotNull { key -> allItemsFlat.find { it.itemKey == key } }
                 Column(modifier = Modifier.weight(1f).fillMaxWidth()) {
                     if (homeList.isEmpty()) {
                         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -797,7 +918,13 @@ fun AppScreen() {
                         }
                     } else {
                         DailySummaryLine(homeList)
-                        HomeFeaturedPager(homeList)
+                        HomeFeaturedPager(
+                            items = homeList,
+                            onRemove = { key ->
+                                homeItems = homeItems - key
+                                scope.launch { repo.setHomeItems(homeItems) }
+                            }
+                        )
                         LazyColumn(
                             modifier = Modifier.weight(1f).fillMaxWidth(),
                             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
@@ -810,9 +937,14 @@ fun AppScreen() {
                                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
                                     rowItems.forEach { priceItem ->
+                                        val idx = homeItems.indexOf(priceItem.itemKey)
                                         HomeGridCard(
                                             priceItem = priceItem,
                                             modifier = Modifier.weight(1f),
+                                            canMoveEarlier = idx > 0,
+                                            canMoveLater = idx in 0 until (homeItems.size - 1),
+                                            onMoveEarlier = { moveHomeItem(priceItem.itemKey, -1) },
+                                            onMoveLater = { moveHomeItem(priceItem.itemKey, 1) },
                                             onRemove = {
                                                 homeItems = homeItems - priceItem.itemKey
                                                 scope.launch { repo.setHomeItems(homeItems) }
