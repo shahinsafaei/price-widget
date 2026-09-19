@@ -20,6 +20,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -37,6 +38,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.glance.appwidget.updateAll
@@ -177,58 +179,62 @@ fun FeaturedPriceCard(
     val pct = item.changePercent
     val positive = (pct ?: 0.0) >= 0
     val trendColor = if (positive) androidx.compose.ui.graphics.Color(0xFF32D74B) else androidx.compose.ui.graphics.Color(0xFFFF453A)
-    Column(
+    Box(
         modifier = modifier
             .shadow(6.dp, RoundedCornerShape(20.dp))
             .clip(RoundedCornerShape(20.dp))
             .background(MaterialTheme.colorScheme.surface)
             .background(trendColor.copy(alpha = 0.08f))
-            .padding(18.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column {
-                Text(
-                    item.displayName,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                if (pct != null) {
+        // Large faded watermark icon in the corner — the number stays the
+        // sharp focal point, the icon is just ambient texture.
+        Text(
+            ir.pricewidget.app.data.IconMap.flag(item.symbol),
+            fontSize = 64.sp,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .offset(x = 10.dp, y = 14.dp)
+                .alpha(0.10f)
+        )
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
                     Text(
-                        "${if (positive) "+" else ""}${"%.1f".format(Locale.US, pct)}%",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = trendColor
+                        item.displayName,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
                     )
+                    if (pct != null) {
+                        Text(
+                            "${if (positive) "+" else ""}${"%.1f".format(Locale.US, pct)}%",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = trendColor
+                        )
+                    }
                 }
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    ir.pricewidget.app.data.IconMap.flag(item.symbol),
-                    style = MaterialTheme.typography.headlineMedium
-                )
                 if (onRemove != null) {
-                    Spacer(Modifier.width(10.dp))
                     Box(
                         modifier = Modifier
-                            .size(28.dp)
+                            .size(26.dp)
                             .clip(RoundedCornerShape(9.dp))
                             .background(MaterialTheme.colorScheme.background.copy(alpha = 0.6f))
                             .clickable { onRemove() },
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("★", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleMedium)
+                        Text("★", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyMedium)
                     }
                 }
             }
+            Spacer(Modifier.height(8.dp))
+            RollingNumberText(
+                text = item.priceValue?.let { "%,.0f".format(Locale.US, it) } ?: item.price ?: "--",
+                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold)
+            )
         }
-        Spacer(Modifier.height(10.dp))
-        RollingNumberText(
-            text = item.priceValue?.let { "%,.0f".format(Locale.US, it) } ?: item.price ?: "--",
-            style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.Bold)
-        )
     }
 }
 
@@ -423,11 +429,11 @@ fun HomeGridCard(
         else androidx.compose.ui.graphics.Color(0xFFFF453A).copy(alpha = 0.07f)
     Column(
         modifier = modifier
-            .shadow(2.dp, RoundedCornerShape(18.dp))
-            .clip(RoundedCornerShape(18.dp))
+            .shadow(2.dp, RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(16.dp))
             .background(MaterialTheme.colorScheme.surface)
             .background(trendTint)
-            .padding(14.dp)
+            .padding(11.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -436,31 +442,31 @@ fun HomeGridCard(
         ) {
             Text(
                 ir.pricewidget.app.data.IconMap.flag(priceItem.symbol),
-                style = MaterialTheme.typography.titleMedium
+                style = MaterialTheme.typography.bodyLarge
             )
             Box(
                 modifier = Modifier
-                    .size(20.dp)
-                    .clip(RoundedCornerShape(10.dp))
+                    .size(18.dp)
+                    .clip(RoundedCornerShape(9.dp))
                     .clickable { onRemove() },
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     Icons.Filled.Close,
                     contentDescription = "حذف",
-                    modifier = Modifier.size(13.dp),
+                    modifier = Modifier.size(12.dp),
                     tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
                 )
             }
         }
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(6.dp))
         Text(
             priceItem.displayName,
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodySmall,
             fontWeight = FontWeight.Medium,
             maxLines = 1
         )
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(6.dp))
         if (pct != null) {
             Text(
                 "${if (positive) "+" else ""}${"%.1f".format(Locale.US, pct)}%",
@@ -471,9 +477,9 @@ fun HomeGridCard(
         }
         RollingNumberText(
             text = priceItem.priceValue?.let { "%,.0f".format(Locale.US, it) } ?: priceItem.price ?: "--",
-            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold)
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold)
         )
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(6.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -481,7 +487,7 @@ fun HomeGridCard(
         ) {
             Box(
                 modifier = Modifier
-                    .size(22.dp)
+                    .size(20.dp)
                     .alpha(if (canMoveEarlier) 1f else 0.25f)
                     .clip(RoundedCornerShape(6.dp))
                     .clickable(enabled = canMoveEarlier) { onMoveEarlier() },
@@ -489,13 +495,13 @@ fun HomeGridCard(
             ) {
                 Text(
                     "‹",
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                 )
             }
             Box(
                 modifier = Modifier
-                    .size(22.dp)
+                    .size(20.dp)
                     .alpha(if (canMoveLater) 1f else 0.25f)
                     .clip(RoundedCornerShape(6.dp))
                     .clickable(enabled = canMoveLater) { onMoveLater() },
@@ -503,11 +509,41 @@ fun HomeGridCard(
             ) {
                 Text(
                     "›",
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                 )
             }
         }
+    }
+}
+
+@Composable
+fun AddItemTile(modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .border(
+                1.dp,
+                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f),
+                RoundedCornerShape(16.dp)
+            )
+            .clickable { onClick() }
+            .padding(11.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            Icons.Filled.Add,
+            contentDescription = "افزودن آیتم",
+            modifier = Modifier.size(20.dp),
+            tint = MaterialTheme.colorScheme.primary
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "افزودن",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.primary
+        )
     }
 }
 
@@ -554,19 +590,22 @@ fun ManageItemsDialog(
                     Tab(
                         selected = selectedTab == 1,
                         onClick = { selectedTab = 1 },
-                        text = { Text("ویجت (${widgetItems.size}/۳)") }
+                        text = { Text("ویجت (${widgetItems.size}/3)") }
                     )
                 }
 
                 OutlinedTextField(
                     value = query,
                     onValueChange = { query = it },
-                    placeholder = { Text("جستجو…") },
+                    placeholder = { Text("جستجو…", style = MaterialTheme.typography.bodySmall) },
                     singleLine = true,
-                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                    textStyle = MaterialTheme.typography.bodyMedium,
+                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                    shape = RoundedCornerShape(14.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 10.dp)
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                        .height(52.dp)
                 )
 
                 limitMessage?.let {
@@ -769,7 +808,7 @@ fun AppScreen() {
             modifier = Modifier
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surface)
-                .padding(horizontal = 20.dp, vertical = 18.dp)
+                .padding(horizontal = 18.dp, vertical = 12.dp)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -779,7 +818,8 @@ fun AppScreen() {
                 Column {
                     Text(
                         stringResource(R.string.app_name),
-                        style = MaterialTheme.typography.headlineMedium
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
                     )
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 2.dp)) {
                         Box(
@@ -917,9 +957,19 @@ fun AppScreen() {
                             }
                         }
                     } else {
+                        // Header shows only the "main 3" (the widget selection if the
+                        // user has one, else the first 3 by order) — the rest of the
+                        // watchlist lives only in the grid below, so nothing is
+                        // duplicated between header and grid.
+                        val widgetInHome = homeItems.filter { it in selected }
+                        val headerKeys = if (widgetInHome.isNotEmpty()) widgetInHome else homeItems.take(3)
+                        var headerList = homeList.filter { it.itemKey in headerKeys }
+                        if (headerList.isEmpty()) headerList = homeList.take(3)
+                        val gridList = homeList.filter { it !in headerList }
+
                         DailySummaryLine(homeList)
                         HomeFeaturedPager(
-                            items = homeList,
+                            items = headerList,
                             onRemove = { key ->
                                 homeItems = homeItems - key
                                 scope.launch { repo.setHomeItems(homeItems) }
@@ -927,20 +977,22 @@ fun AppScreen() {
                         )
                         LazyColumn(
                             modifier = Modifier.weight(1f).fillMaxWidth(),
-                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            val rows = homeList.chunked(2)
-                            items(rows) { rowItems ->
+                            val rows = gridList.chunked(2)
+                            val lastRowHasSpace = rows.isEmpty() || rows.last().size < 2
+                            itemsIndexed(rows) { rowIndex, rowItems ->
+                                val isLastRow = rowIndex == rows.lastIndex
                                 Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     rowItems.forEach { priceItem ->
                                         val idx = homeItems.indexOf(priceItem.itemKey)
                                         HomeGridCard(
                                             priceItem = priceItem,
-                                            modifier = Modifier.weight(1f),
+                                            modifier = Modifier.weight(1f).fillMaxHeight(),
                                             canMoveEarlier = idx > 0,
                                             canMoveLater = idx in 0 until (homeItems.size - 1),
                                             onMoveEarlier = { moveHomeItem(priceItem.itemKey, -1) },
@@ -951,29 +1003,29 @@ fun AppScreen() {
                                             }
                                         )
                                     }
-                                    if (rowItems.size == 1) {
+                                    if (isLastRow && rowItems.size == 1) {
+                                        AddItemTile(
+                                            modifier = Modifier.weight(1f).fillMaxHeight(),
+                                            onClick = { showManageDialog = true }
+                                        )
+                                    }
+                                }
+                            }
+                            if (lastRowHasSpace.not()) {
+                                item {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        AddItemTile(
+                                            modifier = Modifier.weight(1f).fillMaxHeight(),
+                                            onClick = { showManageDialog = true }
+                                        )
                                         Spacer(Modifier.weight(1f))
                                     }
                                 }
                             }
-                            item {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(top = 4.dp)
-                                        .clip(RoundedCornerShape(14.dp))
-                                        .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f), RoundedCornerShape(14.dp))
-                                        .clickable { showManageDialog = true }
-                                        .padding(vertical = 14.dp),
-                                    horizontalArrangement = Arrangement.Center,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                                    Spacer(Modifier.width(6.dp))
-                                    Text("افزودن آیتم", style = MaterialTheme.typography.labelLarge)
-                                }
-                            }
-                            item { Spacer(Modifier.height(8.dp)) }
+                            item { Spacer(Modifier.height(6.dp)) }
                         }
                     }
                 }
@@ -984,7 +1036,7 @@ fun AppScreen() {
             modifier = Modifier
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surface)
-                .padding(16.dp)
+                .padding(horizontal = 14.dp, vertical = 10.dp)
         ) {
             val notifPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
                 androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
@@ -998,74 +1050,118 @@ fun AppScreen() {
                 }
             }
 
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.background)
             ) {
-                Text("نمایش در نوار اعلان‌ها", style = MaterialTheme.typography.bodyMedium)
-                Switch(
-                    checked = notifEnabled,
-                    onCheckedChange = { checked ->
-                        if (checked) {
-                            if (Build.VERSION.SDK_INT >= 33) {
-                                notifPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
-                            } else {
-                                notifEnabled = true
-                                scope.launch {
-                                    repo.setNotificationEnabled(true)
-                                    ir.pricewidget.app.notification.RateNotifier.show(context)
-                                }
-                            }
-                        } else {
-                            notifEnabled = false
-                            scope.launch { repo.setNotificationEnabled(false) }
-                            ir.pricewidget.app.notification.RateNotifier.cancel(context)
-                        }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("🔔", style = MaterialTheme.typography.titleMedium)
+                        Spacer(Modifier.width(10.dp))
+                        Text("نمایش در نوار اعلان‌ها", style = MaterialTheme.typography.bodySmall)
                     }
-                )
-            }
+                    Switch(
+                        checked = notifEnabled,
+                        onCheckedChange = { checked ->
+                            if (checked) {
+                                if (Build.VERSION.SDK_INT >= 33) {
+                                    notifPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                                } else {
+                                    notifEnabled = true
+                                    scope.launch {
+                                        repo.setNotificationEnabled(true)
+                                        ir.pricewidget.app.notification.RateNotifier.show(context)
+                                    }
+                                }
+                            } else {
+                                notifEnabled = false
+                                scope.launch { repo.setNotificationEnabled(false) }
+                                ir.pricewidget.app.notification.RateNotifier.cancel(context)
+                            }
+                        }
+                    )
+                }
 
-            Button(
-                onClick = { showWidgetDialog = true },
-                modifier = Modifier.fillMaxWidth().height(50.dp),
-                shape = RoundedCornerShape(14.dp)
-            ) {
-                Text("افزودن ویجت به صفحه اصلی")
-            }
+                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f))
 
-            Spacer(Modifier.height(10.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    "طراحی و توسعه: شاهین صفایی",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
-                )
-                Text(
-                    " · @shahinsafaei",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.clickable {
-                        val appIntent = android.content.Intent(
-                            android.content.Intent.ACTION_VIEW,
-                            android.net.Uri.parse("instagram://user?username=shahinsafaei")
-                        ).apply { setPackage("com.instagram.android") }
-                        try {
-                            context.startActivity(appIntent)
-                        } catch (e: Exception) {
-                            context.startActivity(
-                                android.content.Intent(
-                                    android.content.Intent.ACTION_VIEW,
-                                    android.net.Uri.parse("https://instagram.com/shahinsafaei")
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showWidgetDialog = true }
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("➕", style = MaterialTheme.typography.titleMedium)
+                        Spacer(Modifier.width(10.dp))
+                        Text(
+                            "افزودن ویجت به صفحه اصلی",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                    Text(
+                        "›",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                    )
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f))
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            val appIntent = android.content.Intent(
+                                android.content.Intent.ACTION_VIEW,
+                                android.net.Uri.parse("instagram://user?username=shahinsafaei")
+                            ).apply { setPackage("com.instagram.android") }
+                            try {
+                                context.startActivity(appIntent)
+                            } catch (e: Exception) {
+                                context.startActivity(
+                                    android.content.Intent(
+                                        android.content.Intent.ACTION_VIEW,
+                                        android.net.Uri.parse("https://instagram.com/shahinsafaei")
+                                    )
                                 )
+                            }
+                        }
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("👨‍💻", style = MaterialTheme.typography.titleMedium)
+                        Spacer(Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                "طراحی و توسعه",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                "شاهین صفایی · @shahinsafaei",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                             )
                         }
                     }
-                )
+                    Text(
+                        "›",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                    )
+                }
             }
         }
     }
