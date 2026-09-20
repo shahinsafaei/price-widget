@@ -34,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -193,13 +194,15 @@ fun FeaturedPriceCard(
                 )
             )
     ) {
-        // Big flag anchored to the visual right edge (Start in RTL), spanning
-        // roughly the full height of the banner — an ambient motif, not the focus.
+        // Big flag anchored to the visual right edge (Start in RTL), aligned with
+        // the price number's row (not the name/percent, which sit above it) so
+        // it sits right behind the number instead of getting lost near the name.
         Text(
             ir.pricewidget.app.data.IconMap.flag(item.symbol),
-            fontSize = 92.sp,
+            fontSize = 88.sp,
             modifier = Modifier
-                .align(Alignment.CenterStart)
+                .align(Alignment.BottomStart)
+                .offset(y = 6.dp)
                 .alpha(0.20f)
         )
         Column(
@@ -355,6 +358,18 @@ fun HomeFeaturedPager(
 ) {
     if (items.isEmpty()) return
     val pagerState = rememberPagerState(pageCount = { items.size })
+    val itemCount = items.size
+
+    // Auto-advance every 5 seconds, like a carousel banner.
+    LaunchedEffect(itemCount) {
+        if (itemCount <= 1) return@LaunchedEffect
+        while (true) {
+            kotlinx.coroutines.delay(5000)
+            val next = (pagerState.currentPage + 1) % itemCount
+            pagerState.animateScrollToPage(next)
+        }
+    }
+
     val currentPage = pagerState.currentPage.coerceIn(0, items.size - 1)
     val offsetFraction = pagerState.currentPageOffsetFraction
     val neighborPage = when {
@@ -1169,10 +1184,15 @@ fun AppScreen() {
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("👨‍💻", style = MaterialTheme.typography.bodySmall)
+                Icon(
+                    painter = painterResource(R.drawable.ic_instagram),
+                    contentDescription = "اینستاگرام",
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
                 Spacer(Modifier.width(6.dp))
                 Text(
-                    "طراحی و توسعه: شاهین صفایی · @shahinsafaei",
+                    "توسعه‌دهنده: شاهین صفایی",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                 )
