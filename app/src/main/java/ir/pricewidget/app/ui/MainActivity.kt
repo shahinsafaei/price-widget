@@ -181,22 +181,32 @@ fun FeaturedPriceCard(
     val trendColor = if (positive) androidx.compose.ui.graphics.Color(0xFF32D74B) else androidx.compose.ui.graphics.Color(0xFFFF453A)
     Box(
         modifier = modifier
-            .shadow(6.dp, RoundedCornerShape(20.dp))
-            .clip(RoundedCornerShape(20.dp))
+            .heightIn(min = 116.dp)
+            .shadow(6.dp, RoundedCornerShape(22.dp))
+            .clip(RoundedCornerShape(22.dp))
             .background(MaterialTheme.colorScheme.surface)
-            .background(trendColor.copy(alpha = 0.08f))
+            .background(
+                // Banner effect: strong color on the physical right edge (where
+                // the big flag sits), fading out toward the left.
+                androidx.compose.ui.graphics.Brush.horizontalGradient(
+                    colors = listOf(trendColor.copy(alpha = 0.04f), trendColor.copy(alpha = 0.28f))
+                )
+            )
     ) {
-        // Large faded watermark icon in the corner — the number stays the
-        // sharp focal point, the icon is just ambient texture.
+        // Big flag anchored to the visual right edge (Start in RTL), spanning
+        // roughly the full height of the banner — an ambient motif, not the focus.
         Text(
             ir.pricewidget.app.data.IconMap.flag(item.symbol),
-            fontSize = 64.sp,
+            fontSize = 92.sp,
             modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .offset(x = 10.dp, y = 14.dp)
-                .alpha(0.10f)
+                .align(Alignment.CenterStart)
+                .alpha(0.20f)
         )
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -442,7 +452,7 @@ fun HomeGridCard(
         ) {
             Text(
                 ir.pricewidget.app.data.IconMap.flag(priceItem.symbol),
-                style = MaterialTheme.typography.bodyLarge
+                fontSize = 22.sp
             )
             Box(
                 modifier = Modifier
@@ -1064,7 +1074,15 @@ fun AppScreen() {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("🔔", style = MaterialTheme.typography.titleMedium)
+                        Box(
+                            modifier = Modifier
+                                .size(34.dp)
+                                .clip(RoundedCornerShape(percent = 50))
+                                .background(androidx.compose.ui.graphics.Color(0xFFFF9F0A).copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("🔔", style = MaterialTheme.typography.bodyMedium)
+                        }
                         Spacer(Modifier.width(10.dp))
                         Text("نمایش در نوار اعلان‌ها", style = MaterialTheme.typography.bodySmall)
                     }
@@ -1101,7 +1119,15 @@ fun AppScreen() {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("➕", style = MaterialTheme.typography.titleMedium)
+                        Box(
+                            modifier = Modifier
+                                .size(34.dp)
+                                .clip(RoundedCornerShape(percent = 50))
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("➕", style = MaterialTheme.typography.bodyMedium)
+                        }
                         Spacer(Modifier.width(10.dp))
                         Text(
                             "افزودن ویجت به صفحه اصلی",
@@ -1115,53 +1141,41 @@ fun AppScreen() {
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
                     )
                 }
-                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f))
+            }
 
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable {
-                            val appIntent = android.content.Intent(
-                                android.content.Intent.ACTION_VIEW,
-                                android.net.Uri.parse("instagram://user?username=shahinsafaei")
-                            ).apply { setPackage("com.instagram.android") }
-                            try {
-                                context.startActivity(appIntent)
-                            } catch (e: Exception) {
-                                context.startActivity(
-                                    android.content.Intent(
-                                        android.content.Intent.ACTION_VIEW,
-                                        android.net.Uri.parse("https://instagram.com/shahinsafaei")
-                                    )
+            Spacer(Modifier.height(10.dp))
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable {
+                        val appIntent = android.content.Intent(
+                            android.content.Intent.ACTION_VIEW,
+                            android.net.Uri.parse("instagram://user?username=shahinsafaei")
+                        ).apply { setPackage("com.instagram.android") }
+                        try {
+                            context.startActivity(appIntent)
+                        } catch (e: Exception) {
+                            context.startActivity(
+                                android.content.Intent(
+                                    android.content.Intent.ACTION_VIEW,
+                                    android.net.Uri.parse("https://instagram.com/shahinsafaei")
                                 )
-                            }
-                        }
-                        .padding(horizontal = 14.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("👨‍💻", style = MaterialTheme.typography.titleMedium)
-                        Spacer(Modifier.width(10.dp))
-                        Column {
-                            Text(
-                                "طراحی و توسعه",
-                                style = MaterialTheme.typography.bodySmall,
-                                fontWeight = FontWeight.Medium
-                            )
-                            Text(
-                                "شاهین صفایی · @shahinsafaei",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                             )
                         }
                     }
-                    Text(
-                        "›",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
-                    )
-                }
+                    .padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("👨‍💻", style = MaterialTheme.typography.bodySmall)
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    "طراحی و توسعه: شاهین صفایی · @shahinsafaei",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                )
             }
         }
     }
