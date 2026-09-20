@@ -180,34 +180,20 @@ fun FeaturedPriceCard(
     val pct = item.changePercent
     val positive = (pct ?: 0.0) >= 0
     val trendColor = if (positive) androidx.compose.ui.graphics.Color(0xFF32D74B) else androidx.compose.ui.graphics.Color(0xFFFF453A)
-    Box(
+    Row(
         modifier = modifier
             .heightIn(min = 116.dp)
             .shadow(6.dp, RoundedCornerShape(22.dp))
             .clip(RoundedCornerShape(22.dp))
             .background(MaterialTheme.colorScheme.surface)
-            .background(
-                // Banner effect: strong color on the physical right edge (where
-                // the big flag sits), fading out toward the left.
-                androidx.compose.ui.graphics.Brush.horizontalGradient(
-                    colors = listOf(trendColor.copy(alpha = 0.04f), trendColor.copy(alpha = 0.28f))
-                )
-            )
+            .background(trendColor.copy(alpha = 0.08f)),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        // Big flag anchored to the visual right edge (Start in RTL), aligned with
-        // the price number's row (not the name/percent, which sit above it) so
-        // it sits right behind the number instead of getting lost near the name.
-        Text(
-            ir.pricewidget.app.data.IconMap.flag(item.symbol),
-            fontSize = 88.sp,
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .offset(y = 6.dp)
-                .alpha(0.20f)
-        )
+        // Text content on the reading side (right, in RTL) — full independent
+        // column, nothing ever overlaps it.
         Column(
             modifier = Modifier
-                .fillMaxWidth()
+                .weight(1f)
                 .padding(16.dp)
         ) {
             Row(
@@ -246,6 +232,20 @@ fun FeaturedPriceCard(
             RollingNumberText(
                 text = item.priceValue?.let { "%,.0f".format(Locale.US, it) } ?: item.price ?: "--",
                 style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold)
+            )
+        }
+        // Flag lives entirely on the other side, in its own lane — it can
+        // never sit behind the name or the number.
+        Box(
+            modifier = Modifier
+                .width(92.dp)
+                .fillMaxHeight()
+                .background(trendColor.copy(alpha = 0.16f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                ir.pricewidget.app.data.IconMap.flag(item.symbol),
+                fontSize = 48.sp
             )
         }
     }
@@ -454,11 +454,11 @@ fun HomeGridCard(
         else androidx.compose.ui.graphics.Color(0xFFFF453A).copy(alpha = 0.07f)
     Column(
         modifier = modifier
-            .shadow(2.dp, RoundedCornerShape(16.dp))
-            .clip(RoundedCornerShape(16.dp))
+            .shadow(2.dp, RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(14.dp))
             .background(MaterialTheme.colorScheme.surface)
             .background(trendTint)
-            .padding(11.dp)
+            .padding(9.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -467,31 +467,31 @@ fun HomeGridCard(
         ) {
             Text(
                 ir.pricewidget.app.data.IconMap.flag(priceItem.symbol),
-                fontSize = 22.sp
+                fontSize = 24.sp
             )
             Box(
                 modifier = Modifier
-                    .size(18.dp)
-                    .clip(RoundedCornerShape(9.dp))
+                    .size(16.dp)
+                    .clip(RoundedCornerShape(8.dp))
                     .clickable { onRemove() },
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     Icons.Filled.Close,
                     contentDescription = "حذف",
-                    modifier = Modifier.size(12.dp),
+                    modifier = Modifier.size(11.dp),
                     tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
                 )
             }
         }
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(5.dp))
         Text(
             priceItem.displayName,
             style = MaterialTheme.typography.bodySmall,
             fontWeight = FontWeight.Medium,
             maxLines = 1
         )
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(5.dp))
         if (pct != null) {
             Text(
                 "${if (positive) "+" else ""}${"%.1f".format(Locale.US, pct)}%",
@@ -502,9 +502,9 @@ fun HomeGridCard(
         }
         RollingNumberText(
             text = priceItem.priceValue?.let { "%,.0f".format(Locale.US, it) } ?: priceItem.price ?: "--",
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold)
+            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold)
         )
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(5.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -512,7 +512,7 @@ fun HomeGridCard(
         ) {
             Box(
                 modifier = Modifier
-                    .size(20.dp)
+                    .size(18.dp)
                     .alpha(if (canMoveEarlier) 1f else 0.25f)
                     .clip(RoundedCornerShape(6.dp))
                     .clickable(enabled = canMoveEarlier) { onMoveEarlier() },
@@ -526,7 +526,7 @@ fun HomeGridCard(
             }
             Box(
                 modifier = Modifier
-                    .size(20.dp)
+                    .size(18.dp)
                     .alpha(if (canMoveLater) 1f else 0.25f)
                     .clip(RoundedCornerShape(6.dp))
                     .clickable(enabled = canMoveLater) { onMoveLater() },
@@ -546,24 +546,24 @@ fun HomeGridCard(
 fun AddItemTile(modifier: Modifier = Modifier, onClick: () -> Unit) {
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(14.dp))
             .border(
                 1.dp,
                 MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f),
-                RoundedCornerShape(16.dp)
+                RoundedCornerShape(14.dp)
             )
             .clickable { onClick() }
-            .padding(11.dp),
+            .padding(9.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
         Icon(
             Icons.Filled.Add,
             contentDescription = "افزودن آیتم",
-            modifier = Modifier.size(20.dp),
+            modifier = Modifier.size(17.dp),
             tint = MaterialTheme.colorScheme.primary
         )
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(3.dp))
         Text(
             "افزودن",
             style = MaterialTheme.typography.labelSmall,
@@ -1075,32 +1075,36 @@ fun AppScreen() {
                 }
             }
 
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(MaterialTheme.colorScheme.background)
+            Row(
+                modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Row(
+                // Notification tile
+                Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 14.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(MaterialTheme.colorScheme.background)
+                        .padding(14.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(34.dp)
-                                .clip(RoundedCornerShape(percent = 50))
-                                .background(androidx.compose.ui.graphics.Color(0xFFFF9F0A).copy(alpha = 0.15f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("🔔", style = MaterialTheme.typography.bodyMedium)
-                        }
-                        Spacer(Modifier.width(10.dp))
-                        Text("نمایش در نوار اعلان‌ها", style = MaterialTheme.typography.bodySmall)
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(RoundedCornerShape(percent = 50))
+                            .background(androidx.compose.ui.graphics.Color(0xFFFF9F0A).copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("🔔", style = MaterialTheme.typography.titleMedium)
                     }
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "نمایش در اعلان‌ها",
+                        style = MaterialTheme.typography.labelMedium,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(Modifier.height(8.dp))
                     Switch(
                         checked = notifEnabled,
                         onCheckedChange = { checked ->
@@ -1123,37 +1127,37 @@ fun AppScreen() {
                     )
                 }
 
-                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f))
-
-                Row(
+                // Add-widget tile
+                Column(
                     modifier = Modifier
-                        .fillMaxWidth()
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(MaterialTheme.colorScheme.background)
                         .clickable { showWidgetDialog = true }
-                        .padding(horizontal = 14.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(14.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(34.dp)
-                                .clip(RoundedCornerShape(percent = 50))
-                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("➕", style = MaterialTheme.typography.bodyMedium)
-                        }
-                        Spacer(Modifier.width(10.dp))
-                        Text(
-                            "افزودن ویجت به صفحه اصلی",
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.Medium
-                        )
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(RoundedCornerShape(percent = 50))
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("➕", style = MaterialTheme.typography.titleMedium)
                     }
+                    Spacer(Modifier.height(8.dp))
                     Text(
-                        "›",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                        "افزودن ویجت",
+                        style = MaterialTheme.typography.labelMedium,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "به صفحه اصلی ›",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
                     )
                 }
             }
