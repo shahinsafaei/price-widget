@@ -182,7 +182,7 @@ fun FeaturedPriceCard(
     val trendColor = if (positive) androidx.compose.ui.graphics.Color(0xFF32D74B) else androidx.compose.ui.graphics.Color(0xFFFF453A)
     Row(
         modifier = modifier
-            .heightIn(min = 116.dp)
+            .height(IntrinsicSize.Min)
             .shadow(6.dp, RoundedCornerShape(22.dp))
             .clip(RoundedCornerShape(22.dp))
             .background(MaterialTheme.colorScheme.surface)
@@ -234,13 +234,12 @@ fun FeaturedPriceCard(
                 style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold)
             )
         }
-        // Flag lives entirely on the other side, in its own lane — it can
-        // never sit behind the name or the number.
+        // Flag lives entirely on the other side, in its own lane — no separate
+        // background, just the glyph, so it doesn't look like a boxed sticker.
         Box(
             modifier = Modifier
-                .width(92.dp)
-                .fillMaxHeight()
-                .background(trendColor.copy(alpha = 0.16f)),
+                .width(88.dp)
+                .fillMaxHeight(),
             contentAlignment = Alignment.Center
         ) {
             Text(
