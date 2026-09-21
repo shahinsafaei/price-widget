@@ -33,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -1094,21 +1095,41 @@ fun AppScreen() {
                     .height(IntrinsicSize.Min),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                // Notification tile — compact, single line
+                // Notification tile — matches PriceCard styling: subtle shadow,
+                // surface background, faint border, colored icon badge.
                 Row(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxHeight()
+                        .shadow(1.dp, RoundedCornerShape(14.dp))
                         .clip(RoundedCornerShape(14.dp))
-                        .background(MaterialTheme.colorScheme.background)
-                        .padding(horizontal = 10.dp, vertical = 10.dp),
+                        .background(MaterialTheme.colorScheme.surface)
+                        .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), RoundedCornerShape(14.dp))
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("🔔", style = MaterialTheme.typography.bodySmall)
-                        Spacer(Modifier.width(6.dp))
-                        Text("اعلان‌ها", style = MaterialTheme.typography.labelSmall)
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(RoundedCornerShape(9.dp))
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Filled.Notifications,
+                                contentDescription = null,
+                                modifier = Modifier.size(15.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            "اعلان‌ها",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Medium
+                        )
                     }
                     Switch(
                         checked = notifEnabled,
@@ -1128,31 +1149,52 @@ fun AppScreen() {
                                 scope.launch { repo.setNotificationEnabled(false) }
                                 ir.pricewidget.app.notification.RateNotifier.cancel(context)
                             }
-                        }
+                        },
+                        modifier = Modifier.scale(0.8f)
                     )
                 }
 
-                // Add-widget tile — compact, single line
+                // Add-widget tile — same card language as the notification tile.
                 Row(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxHeight()
+                        .shadow(1.dp, RoundedCornerShape(14.dp))
                         .clip(RoundedCornerShape(14.dp))
-                        .background(MaterialTheme.colorScheme.background)
+                        .background(MaterialTheme.colorScheme.surface)
+                        .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), RoundedCornerShape(14.dp))
                         .clickable { showWidgetDialog = true }
-                        .padding(horizontal = 10.dp, vertical = 10.dp),
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("➕", style = MaterialTheme.typography.bodySmall)
-                        Spacer(Modifier.width(6.dp))
-                        Text("ویجت", style = MaterialTheme.typography.labelSmall)
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(RoundedCornerShape(9.dp))
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Filled.Add,
+                                contentDescription = null,
+                                modifier = Modifier.size(15.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            "ویجت",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Medium
+                        )
                     }
-                    Text(
-                        "›",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                    Icon(
+                        Icons.Filled.KeyboardArrowLeft,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
                     )
                 }
             }
