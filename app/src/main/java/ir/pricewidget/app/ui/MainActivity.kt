@@ -180,70 +180,85 @@ fun FeaturedPriceCard(
     val pct = item.changePercent
     val positive = (pct ?: 0.0) >= 0
     val trendColor = if (positive) androidx.compose.ui.graphics.Color(0xFF32D74B) else androidx.compose.ui.graphics.Color(0xFFFF453A)
-    Box(
-        modifier = modifier
-            .shadow(6.dp, RoundedCornerShape(22.dp))
-            .clip(RoundedCornerShape(22.dp))
-            .background(MaterialTheme.colorScheme.surface)
-            .background(trendColor.copy(alpha = 0.08f))
+    // The whole card is pinned to RTL explicitly. Reasoning: alignment/order
+    // (Row child order, Alignment.TopStart/End) is resolved by the PARENT
+    // layout node using whatever LocalLayoutDirection was active where THAT
+    // parent was composed — a provider wrapped only around one child (like
+    // just the star) has no effect on how its parent places it, so the whole
+    // subtree needs the override together. Some phones resolve this app's
+    // ambient layout direction as LTR even with Persian text (it follows the
+    // phone's system language setting, not the string content), which is
+    // what caused the name/flag/star to land on the wrong sides before.
+    // Forcing RTL here guarantees: name+number on the right, flag on the
+    // left, star top-right — identical on every device.
+    androidx.compose.runtime.CompositionLocalProvider(
+        androidx.compose.ui.platform.LocalLayoutDirection provides androidx.compose.ui.unit.LayoutDirection.Rtl
     ) {
-        Row(
-            modifier = Modifier.height(IntrinsicSize.Min),
-            verticalAlignment = Alignment.CenterVertically
+        Box(
+            modifier = modifier
+                .shadow(6.dp, RoundedCornerShape(22.dp))
+                .clip(RoundedCornerShape(22.dp))
+                .background(MaterialTheme.colorScheme.surface)
+                .background(trendColor.copy(alpha = 0.08f))
         ) {
-            // Text content on the reading side (right, in RTL) — full independent
-            // column, nothing ever overlaps it.
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(16.dp)
+            Row(
+                modifier = Modifier.height(IntrinsicSize.Min),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    item.displayName,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold
-                )
-                if (pct != null) {
+                // Text content on the reading side (right) — full independent
+                // column, nothing ever overlaps it.
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(16.dp)
+                ) {
                     Text(
-                        "${if (positive) "+" else ""}${"%.1f".format(Locale.US, pct)}%",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = trendColor
+                        item.displayName,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    if (pct != null) {
+                        Text(
+                            "${if (positive) "+" else ""}${"%.1f".format(Locale.US, pct)}%",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = trendColor
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    RollingNumberText(
+                        text = item.priceValue?.let { "%,.0f".format(Locale.US, it) } ?: item.price ?: "--",
+                        style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold)
                     )
                 }
-                Spacer(Modifier.height(8.dp))
-                RollingNumberText(
-                    text = item.priceValue?.let { "%,.0f".format(Locale.US, it) } ?: item.price ?: "--",
-                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold)
-                )
+                // Flag lives entirely on the other side (left), in its own lane
+                // — no separate background, just the glyph.
+                Box(
+                    modifier = Modifier
+                        .width(88.dp)
+                        .fillMaxHeight(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        ir.pricewidget.app.data.IconMap.flag(item.symbol),
+                        fontSize = 48.sp
+                    )
+                }
             }
-            // Flag lives entirely on the other side, in its own lane — no separate
-            // background, just the glyph, so it doesn't look like a boxed sticker.
-            Box(
-                modifier = Modifier
-                    .width(88.dp)
-                    .fillMaxHeight(),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    ir.pricewidget.app.data.IconMap.flag(item.symbol),
-                    fontSize = 48.sp
-                )
-            }
-        }
-        // Star sits in the true top-right corner of the card as an overlay,
-        // clear of both the name and the flag.
-        if (onRemove != null) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(10.dp)
-                    .size(26.dp)
-                    .clip(RoundedCornerShape(9.dp))
-                    .background(MaterialTheme.colorScheme.background.copy(alpha = 0.6f))
-                    .clickable { onRemove() },
-                contentAlignment = Alignment.Center
-            ) {
-                Text("★", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyMedium)
+            // Star sits in the true top-right corner of the card as an
+            // overlay, clear of both the name and the flag.
+            if (onRemove != null) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(10.dp)
+                        .size(26.dp)
+                        .clip(RoundedCornerShape(9.dp))
+                        .background(MaterialTheme.colorScheme.background.copy(alpha = 0.6f))
+                        .clickable { onRemove() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("★", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyMedium)
+                }
             }
         }
     }
@@ -1073,24 +1088,24 @@ fun AppScreen() {
                 }
             }
 
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(MaterialTheme.colorScheme.background)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                // Notification row — compact, single line
+                // Notification tile — compact, single line
                 Row(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                        .weight(1f)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(MaterialTheme.colorScheme.background)
+                        .padding(horizontal = 10.dp, vertical = 10.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("🔔", style = MaterialTheme.typography.bodyMedium)
-                        Spacer(Modifier.width(10.dp))
-                        Text("نمایش در اعلان‌ها", style = MaterialTheme.typography.labelMedium)
+                        Text("🔔", style = MaterialTheme.typography.bodySmall)
+                        Spacer(Modifier.width(6.dp))
+                        Text("اعلان‌ها", style = MaterialTheme.typography.labelSmall)
                     }
                     Switch(
                         checked = notifEnabled,
@@ -1114,25 +1129,25 @@ fun AppScreen() {
                     )
                 }
 
-                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f))
-
-                // Add-widget row — compact, single line
+                // Add-widget tile — compact, single line
                 Row(
                     modifier = Modifier
-                        .fillMaxWidth()
+                        .weight(1f)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(MaterialTheme.colorScheme.background)
                         .clickable { showWidgetDialog = true }
-                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                        .padding(horizontal = 10.dp, vertical = 10.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("➕", style = MaterialTheme.typography.bodyMedium)
-                        Spacer(Modifier.width(10.dp))
-                        Text("افزودن ویجت به صفحه اصلی", style = MaterialTheme.typography.labelMedium)
+                        Text("➕", style = MaterialTheme.typography.bodySmall)
+                        Spacer(Modifier.width(6.dp))
+                        Text("ویجت", style = MaterialTheme.typography.labelSmall)
                     }
                     Text(
                         "›",
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
                     )
                 }
