@@ -249,7 +249,7 @@ fun FeaturedPriceCard(
             if (onRemove != null) {
                 Box(
                     modifier = Modifier
-                        .align(Alignment.TopStart)
+                        .align(Alignment.TopEnd)
                         .padding(10.dp)
                         .size(26.dp)
                         .clip(RoundedCornerShape(9.dp))
@@ -1089,13 +1089,16 @@ fun AppScreen() {
             }
 
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(IntrinsicSize.Min),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 // Notification tile — compact, single line
                 Row(
                     modifier = Modifier
                         .weight(1f)
+                        .fillMaxHeight()
                         .clip(RoundedCornerShape(14.dp))
                         .background(MaterialTheme.colorScheme.background)
                         .padding(horizontal = 10.dp, vertical = 10.dp),
@@ -1133,6 +1136,7 @@ fun AppScreen() {
                 Row(
                     modifier = Modifier
                         .weight(1f)
+                        .fillMaxHeight()
                         .clip(RoundedCornerShape(14.dp))
                         .background(MaterialTheme.colorScheme.background)
                         .clickable { showWidgetDialog = true }
