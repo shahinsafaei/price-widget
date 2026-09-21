@@ -405,13 +405,13 @@ fun HomeFeaturedPager(
     )
 
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(ambientColor.copy(alpha = 0.05f))
+        modifier = Modifier.fillMaxWidth()
     ) {
         HorizontalPager(
             state = pagerState,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(ambientColor.copy(alpha = 0.05f)),
             contentPadding = PaddingValues(horizontal = 36.dp),
             pageSpacing = 12.dp
         ) { page ->
