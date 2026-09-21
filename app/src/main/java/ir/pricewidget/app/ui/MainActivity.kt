@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -1179,7 +1180,7 @@ fun AppScreen() {
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                Icons.Filled.Add,
+                                Icons.Filled.Widgets,
                                 contentDescription = null,
                                 modifier = Modifier.size(15.dp),
                                 tint = MaterialTheme.colorScheme.primary
@@ -1192,12 +1193,20 @@ fun AppScreen() {
                             fontWeight = FontWeight.Medium
                         )
                     }
-                    Icon(
-                        Icons.Filled.KeyboardArrowLeft,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
-                    )
+                    Box(
+                        modifier = Modifier
+                            .size(22.dp)
+                            .clip(RoundedCornerShape(11.dp))
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Filled.Add,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
             }
 
