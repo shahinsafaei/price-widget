@@ -180,72 +180,71 @@ fun FeaturedPriceCard(
     val pct = item.changePercent
     val positive = (pct ?: 0.0) >= 0
     val trendColor = if (positive) androidx.compose.ui.graphics.Color(0xFF32D74B) else androidx.compose.ui.graphics.Color(0xFFFF453A)
-    Row(
+    Box(
         modifier = modifier
-            .height(IntrinsicSize.Min)
             .shadow(6.dp, RoundedCornerShape(22.dp))
             .clip(RoundedCornerShape(22.dp))
             .background(MaterialTheme.colorScheme.surface)
-            .background(trendColor.copy(alpha = 0.08f)),
-        verticalAlignment = Alignment.CenterVertically
+            .background(trendColor.copy(alpha = 0.08f))
     ) {
-        // Text content on the reading side (right, in RTL) — full independent
-        // column, nothing ever overlaps it.
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .padding(16.dp)
+        Row(
+            modifier = Modifier.height(IntrinsicSize.Min),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            // Text content on the reading side (right, in RTL) — full independent
+            // column, nothing ever overlaps it.
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(16.dp)
             ) {
-                Column {
+                Text(
+                    item.displayName,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                if (pct != null) {
                     Text(
-                        item.displayName,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold
+                        "${if (positive) "+" else ""}${"%.1f".format(Locale.US, pct)}%",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = trendColor
                     )
-                    if (pct != null) {
-                        Text(
-                            "${if (positive) "+" else ""}${"%.1f".format(Locale.US, pct)}%",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = trendColor
-                        )
-                    }
                 }
-                if (onRemove != null) {
-                    Box(
-                        modifier = Modifier
-                            .size(26.dp)
-                            .clip(RoundedCornerShape(9.dp))
-                            .background(MaterialTheme.colorScheme.background.copy(alpha = 0.6f))
-                            .clickable { onRemove() },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("★", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyMedium)
-                    }
-                }
+                Spacer(Modifier.height(8.dp))
+                RollingNumberText(
+                    text = item.priceValue?.let { "%,.0f".format(Locale.US, it) } ?: item.price ?: "--",
+                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold)
+                )
             }
-            Spacer(Modifier.height(8.dp))
-            RollingNumberText(
-                text = item.priceValue?.let { "%,.0f".format(Locale.US, it) } ?: item.price ?: "--",
-                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold)
-            )
+            // Flag lives entirely on the other side, in its own lane — no separate
+            // background, just the glyph, so it doesn't look like a boxed sticker.
+            Box(
+                modifier = Modifier
+                    .width(88.dp)
+                    .fillMaxHeight(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    ir.pricewidget.app.data.IconMap.flag(item.symbol),
+                    fontSize = 48.sp
+                )
+            }
         }
-        // Flag lives entirely on the other side, in its own lane — no separate
-        // background, just the glyph, so it doesn't look like a boxed sticker.
-        Box(
-            modifier = Modifier
-                .width(88.dp)
-                .fillMaxHeight(),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                ir.pricewidget.app.data.IconMap.flag(item.symbol),
-                fontSize = 48.sp
-            )
+        // Star sits in the true top-right corner of the card as an overlay,
+        // clear of both the name and the flag.
+        if (onRemove != null) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(10.dp)
+                    .size(26.dp)
+                    .clip(RoundedCornerShape(9.dp))
+                    .background(MaterialTheme.colorScheme.background.copy(alpha = 0.6f))
+                    .clickable { onRemove() },
+                contentAlignment = Alignment.Center
+            ) {
+                Text("★", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyMedium)
+            }
         }
     }
 }
@@ -363,7 +362,7 @@ fun HomeFeaturedPager(
     LaunchedEffect(itemCount) {
         if (itemCount <= 1) return@LaunchedEffect
         while (true) {
-            kotlinx.coroutines.delay(5000)
+            kotlinx.coroutines.delay(7000)
             val next = (pagerState.currentPage + 1) % itemCount
             pagerState.animateScrollToPage(next)
         }
@@ -1074,36 +1073,25 @@ fun AppScreen() {
                 }
             }
 
-            Row(
-                modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(MaterialTheme.colorScheme.background)
             ) {
-                // Notification tile
-                Column(
+                // Notification row — compact, single line
+                Row(
                     modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(MaterialTheme.colorScheme.background)
-                        .padding(14.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(38.dp)
-                            .clip(RoundedCornerShape(percent = 50))
-                            .background(androidx.compose.ui.graphics.Color(0xFFFF9F0A).copy(alpha = 0.15f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("🔔", style = MaterialTheme.typography.titleMedium)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("🔔", style = MaterialTheme.typography.bodyMedium)
+                        Spacer(Modifier.width(10.dp))
+                        Text("نمایش در اعلان‌ها", style = MaterialTheme.typography.labelMedium)
                     }
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        "نمایش در اعلان‌ها",
-                        style = MaterialTheme.typography.labelMedium,
-                        textAlign = TextAlign.Center
-                    )
-                    Spacer(Modifier.height(8.dp))
                     Switch(
                         checked = notifEnabled,
                         onCheckedChange = { checked ->
@@ -1126,37 +1114,26 @@ fun AppScreen() {
                     )
                 }
 
-                // Add-widget tile
-                Column(
+                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f))
+
+                // Add-widget row — compact, single line
+                Row(
                     modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(MaterialTheme.colorScheme.background)
+                        .fillMaxWidth()
                         .clickable { showWidgetDialog = true }
-                        .padding(14.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(38.dp)
-                            .clip(RoundedCornerShape(percent = 50))
-                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("➕", style = MaterialTheme.typography.titleMedium)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("➕", style = MaterialTheme.typography.bodyMedium)
+                        Spacer(Modifier.width(10.dp))
+                        Text("افزودن ویجت به صفحه اصلی", style = MaterialTheme.typography.labelMedium)
                     }
-                    Spacer(Modifier.height(8.dp))
                     Text(
-                        "افزودن ویجت",
-                        style = MaterialTheme.typography.labelMedium,
-                        textAlign = TextAlign.Center
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        "به صفحه اصلی ›",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                        "›",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
                     )
                 }
             }
