@@ -759,6 +759,17 @@ private fun isMarketOpenNow(): Boolean {
     return hour in 9 until 20
 }
 
+/** "1405/07/01 16:50" — تاریخ و ساعت شمسی با ارقام لاتین */
+private fun persianDateTimeNowLabel(): String {
+    val cal = android.icu.util.Calendar.getInstance(android.icu.util.ULocale.forLanguageTag("fa-u-ca-persian"))
+    val year = cal.get(android.icu.util.Calendar.YEAR)
+    val month = cal.get(android.icu.util.Calendar.MONTH) + 1
+    val day = cal.get(android.icu.util.Calendar.DAY_OF_MONTH)
+    val hour = cal.get(android.icu.util.Calendar.HOUR_OF_DAY)
+    val minute = cal.get(android.icu.util.Calendar.MINUTE)
+    return "%d/%02d/%02d %02d:%02d".format(java.util.Locale.US, year, month, day, hour, minute)
+}
+
 /** Default watchlist for first-time users: dollar, euro, 18k gold, bitcoin. */
 private val DEFAULT_HOME_SYMBOLS = listOf("USD", "EUR", "IR_GOLD_18K", "BTC")
 
@@ -796,7 +807,7 @@ fun AppScreen() {
             val previousPrices = response?.allItems()?.associate { it.second.itemKey to it.second.price }
             val result = ApiService.create().getGoldCurrency()
             response = result
-            val now = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date())
+            val now = persianDateTimeNowLabel()
             repo.saveCache(result, now)
             lastUpdated = now
             error = null
@@ -846,61 +857,51 @@ fun AppScreen() {
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        Column(
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surface)
                 .padding(horizontal = 18.dp, vertical = 12.dp)
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier.fillMaxWidth()
+            Text(
+                stringResource(R.string.app_name),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(Modifier.width(10.dp))
+            Box(
+                modifier = Modifier
+                    .size(7.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(if (marketOpen) androidx.compose.ui.graphics.Color(0xFF32D74B) else androidx.compose.ui.graphics.Color(0xFFFF453A))
+            )
+            Spacer(Modifier.width(5.dp))
+            Text(
+                if (marketOpen) "بازار باز" else "بازار بسته",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                modifier = Modifier.weight(1f)
+            )
+            Text(
+                lastUpdated ?: "",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+            )
+            IconButton(
+                onClick = {
+                    scope.launch {
+                        refreshing = true
+                        refresh(hapticOnChange = true)
+                        refreshing = false
+                    }
+                },
+                modifier = Modifier.size(28.dp)
             ) {
-                Column {
-                    Text(
-                        stringResource(R.string.app_name),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 2.dp)) {
-                        Box(
-                            modifier = Modifier
-                                .size(7.dp)
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(if (marketOpen) androidx.compose.ui.graphics.Color(0xFF32D74B) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f))
-                        )
-                        Spacer(Modifier.width(5.dp))
-                        Text(
-                            if (marketOpen) "بازار باز است" else "بازار بسته — آخرین قیمت",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                        )
-                    }
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        lastUpdated?.let { "بروزرسانی: $it" } ?: "",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                        modifier = Modifier.padding(end = 6.dp)
-                    )
-                    IconButton(
-                        onClick = {
-                            scope.launch {
-                                refreshing = true
-                                refresh(hapticOnChange = true)
-                                refreshing = false
-                            }
-                        },
-                        modifier = Modifier.size(32.dp)
-                    ) {
-                        if (refreshing) {
-                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                        } else {
-                            Icon(Icons.Filled.Refresh, contentDescription = "بروزرسانی", modifier = Modifier.size(18.dp))
-                        }
-                    }
+                if (refreshing) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                } else {
+                    Icon(Icons.Filled.Refresh, contentDescription = "بروزرسانی", modifier = Modifier.size(18.dp))
                 }
             }
         }
