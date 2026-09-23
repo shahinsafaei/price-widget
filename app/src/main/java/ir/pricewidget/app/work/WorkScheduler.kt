@@ -31,4 +31,19 @@ object WorkScheduler {
             .build()
         WorkManager.getInstance(context).enqueue(request)
     }
+
+    /**
+     * Refresh the home-screen widget right now, independent of the UI's
+     * lifecycle (see WidgetRefreshWorker for why this matters). This does
+     * NOT hit the network — call it any time saved widget settings change
+     * (item selection, dark/light mode).
+     */
+    fun refreshWidgetNow(context: Context) {
+        val request = androidx.work.OneTimeWorkRequestBuilder<WidgetRefreshWorker>().build()
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            "widget_refresh_now",
+            androidx.work.ExistingWorkPolicy.REPLACE,
+            request
+        )
+    }
 }

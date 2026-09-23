@@ -817,7 +817,7 @@ fun AppScreen() {
             repo.saveCache(result, now)
             lastUpdated = now
             error = null
-            PriceWidget.forceUpdateAll(context)
+            WorkScheduler.refreshWidgetNow(context)
             if (hapticOnChange && previousPrices != null) {
                 val changed = result.allItems().any { (_, item) -> previousPrices[item.itemKey] != null && previousPrices[item.itemKey] != item.price }
                 if (changed) haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
@@ -1296,8 +1296,8 @@ fun AppScreen() {
                     limitMessage = null
                     scope.launch {
                         repo.setSelectedItems(selected)
-                        PriceWidget.forceUpdateAll(context)
                     }
+                    WorkScheduler.refreshWidgetNow(context)
                 }
             },
             onDismiss = { showManageDialog = false; limitMessage = null }
@@ -1315,8 +1315,9 @@ fun AppScreen() {
                 isDark = dialogDark
                 scope.launch {
                     repo.setWidgetDark(dialogDark)
-                    PriceWidget.forceUpdateAll(context)
-
+                }
+                WorkScheduler.refreshWidgetNow(context)
+                scope.launch {
                     val alreadyPinned = GlanceAppWidgetManager(context)
                         .getGlanceIds(PriceWidget::class.java)
                         .isNotEmpty()
