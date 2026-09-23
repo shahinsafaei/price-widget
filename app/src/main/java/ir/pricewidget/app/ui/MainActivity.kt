@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Widgets
+import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -1316,7 +1317,16 @@ fun AppScreen() {
                     repo.setWidgetDark(dialogDark)
                     PriceWidget.forceUpdateAll(context)
                 }
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val alreadyPinned = GlanceAppWidgetManager(context)
+                    .getGlanceIds(PriceWidget::class.java)
+                    .isNotEmpty()
+                if (alreadyPinned) {
+                    android.widget.Toast.makeText(
+                        context,
+                        "تنظیمات ویجت ذخیره و اعمال شد",
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     val appWidgetManager = context.getSystemService(AppWidgetManager::class.java)
                     val provider = ComponentName(context, PriceWidgetReceiver::class.java)
                     if (appWidgetManager.isRequestPinAppWidgetSupported) {
