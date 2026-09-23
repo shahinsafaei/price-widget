@@ -1,7 +1,6 @@
 package ir.pricewidget.app.work
 
 import android.content.Context
-import androidx.glance.appwidget.updateAll
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import ir.pricewidget.app.data.ApiService
@@ -31,7 +30,7 @@ class UpdateWorker(
             val response = ApiService.create().getGoldCurrency()
             val now = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
             repo.saveCache(response, now)
-            PriceWidget().updateAll(applicationContext)
+            PriceWidget.forceUpdateAll(applicationContext)
             ir.pricewidget.app.notification.RateNotifier.show(applicationContext)
             Result.success()
         } catch (e: Exception) {

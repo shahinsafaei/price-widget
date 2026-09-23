@@ -13,6 +13,7 @@ import androidx.glance.ImageProvider
 import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
+import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
@@ -84,6 +85,27 @@ private fun formatWidgetPrice(item: PriceItem): String {
 }
 
 class PriceWidget : GlanceAppWidget() {
+
+    companion object {
+        private const val TAG = "PriceWidget"
+
+        suspend fun forceUpdateAll(context: Context) {
+            val widget = PriceWidget()
+            val ids = try {
+                GlanceAppWidgetManager(context).getGlanceIds(PriceWidget::class.java)
+            } catch (e: Exception) {
+                android.util.Log.e(TAG, "Failed to fetch GlanceIds for update", e)
+                emptyList()
+            }
+            ids.forEach { id ->
+                try {
+                    widget.update(context, id)
+                } catch (e: Exception) {
+                    android.util.Log.e(TAG, "Failed to update widget instance $id", e)
+                }
+            }
+        }
+    }
 
     override val sizeMode = SizeMode.Responsive(setOf(SMALL, LARGE))
 

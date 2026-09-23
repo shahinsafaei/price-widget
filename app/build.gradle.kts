@@ -11,8 +11,8 @@ android {
         applicationId = "ir.pricewidget.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 13
-        versionName = "2.9.9"
+        versionCode = 14
+        versionName = "2.9.9.2"
     }
 
     signingConfigs {

@@ -46,7 +46,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import androidx.glance.appwidget.updateAll
 import ir.pricewidget.app.R
 import ir.pricewidget.app.data.ApiService
 import ir.pricewidget.app.data.GoldCurrencyResponse
@@ -759,15 +758,21 @@ private fun isMarketOpenNow(): Boolean {
     return hour in 9 until 20
 }
 
-/** "1405/07/01 16:50" — تاریخ و ساعت شمسی با ارقام لاتین */
+/** "1405/07/01 16:50" — Jalali date + time, Latin digits, via ICU (available since API 24).
+ *  Falls back to a plain Gregorian HH:mm if ICU's Persian calendar isn't available on this
+ *  device/ROM, so a broken ICU implementation never crashes the app. */
 private fun persianDateTimeNowLabel(): String {
-    val cal = android.icu.util.Calendar.getInstance(android.icu.util.ULocale.forLanguageTag("fa-u-ca-persian"))
-    val year = cal.get(android.icu.util.Calendar.YEAR)
-    val month = cal.get(android.icu.util.Calendar.MONTH) + 1
-    val day = cal.get(android.icu.util.Calendar.DAY_OF_MONTH)
-    val hour = cal.get(android.icu.util.Calendar.HOUR_OF_DAY)
-    val minute = cal.get(android.icu.util.Calendar.MINUTE)
-    return "%d/%02d/%02d %02d:%02d".format(java.util.Locale.US, year, month, day, hour, minute)
+    return try {
+        val cal = android.icu.util.Calendar.getInstance(android.icu.util.ULocale.forLanguageTag("fa-u-ca-persian"))
+        val year = cal.get(android.icu.util.Calendar.YEAR)
+        val month = cal.get(android.icu.util.Calendar.MONTH) + 1
+        val day = cal.get(android.icu.util.Calendar.DAY_OF_MONTH)
+        val hour = cal.get(android.icu.util.Calendar.HOUR_OF_DAY)
+        val minute = cal.get(android.icu.util.Calendar.MINUTE)
+        "%d/%02d/%02d %02d:%02d".format(java.util.Locale.US, year, month, day, hour, minute)
+    } catch (e: Exception) {
+        java.text.SimpleDateFormat("HH:mm", java.util.Locale.US).format(java.util.Date())
+    }
 }
 
 /** Default watchlist for first-time users: dollar, euro, 18k gold, bitcoin. */
@@ -811,7 +816,7 @@ fun AppScreen() {
             repo.saveCache(result, now)
             lastUpdated = now
             error = null
-            PriceWidget().updateAll(context)
+            PriceWidget.forceUpdateAll(context)
             if (hapticOnChange && previousPrices != null) {
                 val changed = result.allItems().any { (_, item) -> previousPrices[item.itemKey] != null && previousPrices[item.itemKey] != item.price }
                 if (changed) haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
@@ -1290,7 +1295,7 @@ fun AppScreen() {
                     limitMessage = null
                     scope.launch {
                         repo.setSelectedItems(selected)
-                        PriceWidget().updateAll(context)
+                        PriceWidget.forceUpdateAll(context)
                     }
                 }
             },
@@ -1309,7 +1314,7 @@ fun AppScreen() {
                 isDark = dialogDark
                 scope.launch {
                     repo.setWidgetDark(dialogDark)
-                    PriceWidget().updateAll(context)
+                    PriceWidget.forceUpdateAll(context)
                 }
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     val appWidgetManager = context.getSystemService(AppWidgetManager::class.java)
