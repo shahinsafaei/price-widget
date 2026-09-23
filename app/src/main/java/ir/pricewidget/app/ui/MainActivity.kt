@@ -1353,30 +1353,6 @@ fun AppScreen() {
                     }
                 }
             }
-                    val appWidgetManager = context.getSystemService(AppWidgetManager::class.java)
-                    val provider = ComponentName(context, PriceWidgetReceiver::class.java)
-                    if (appWidgetManager.isRequestPinAppWidgetSupported) {
-                        android.widget.Toast.makeText(
-                            context,
-                            "درخواست افزودن ویجت ارسال شد — تایید کن",
-                            android.widget.Toast.LENGTH_SHORT
-                        ).show()
-                        appWidgetManager.requestPinAppWidget(provider, null, null)
-                    } else {
-                        android.widget.Toast.makeText(
-                            context,
-                            "این گوشی افزودن خودکار ویجت رو پشتیبانی نمی‌کنه؛ دستی از صفحه اصلی اضافه کن",
-                            android.widget.Toast.LENGTH_LONG
-                        ).show()
-                    }
-                } else {
-                    android.widget.Toast.makeText(
-                        context,
-                        "ویجت رو از صفحه اصلی گوشی دستی اضافه کن",
-                        android.widget.Toast.LENGTH_LONG
-                    ).show()
-                }
-            }
         )
     }
 }
