@@ -46,4 +46,38 @@ object WorkScheduler {
             request
         )
     }
+
+    /** ذخیره‌ی تضمینی تم ویجت (روشن/تیره + پیرو سیستم)، مستقل از عمر صفحه. */
+    fun saveWidgetTheme(context: Context, dark: Boolean, followSystem: Boolean) {
+        val data = Data.Builder()
+            .putBoolean(WidgetRefreshWorker.KEY_DARK, dark)
+            .putBoolean(WidgetRefreshWorker.KEY_FOLLOW_SYSTEM, followSystem)
+            .build()
+        val request = androidx.work.OneTimeWorkRequestBuilder<WidgetRefreshWorker>()
+            .setInputData(data)
+            .build()
+        WorkManager.getInstance(context).enqueue(request)
+    }
+
+    /** ذخیره‌ی تضمینی آیتم‌های انتخاب‌شده برای ویجت، مستقل از عمر صفحه. */
+    fun saveWidgetItems(context: Context, items: Set<String>) {
+        val data = Data.Builder()
+            .putStringArray(WidgetRefreshWorker.KEY_SELECTED_ITEMS, items.toTypedArray())
+            .build()
+        val request = androidx.work.OneTimeWorkRequestBuilder<WidgetRefreshWorker>()
+            .setInputData(data)
+            .build()
+        WorkManager.getInstance(context).enqueue(request)
+    }
+
+    /** ذخیره‌ی تضمینی آیتم‌های صفحه‌ی اصلی، مستقل از عمر صفحه. */
+    fun saveHomeItems(context: Context, items: List<String>) {
+        val data = Data.Builder()
+            .putStringArray(WidgetRefreshWorker.KEY_HOME_ITEMS, items.toTypedArray())
+            .build()
+        val request = androidx.work.OneTimeWorkRequestBuilder<WidgetRefreshWorker>()
+            .setInputData(data)
+            .build()
+        WorkManager.getInstance(context).enqueue(request)
+    }
 }

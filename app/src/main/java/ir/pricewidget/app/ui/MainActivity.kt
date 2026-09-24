@@ -48,6 +48,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.material3.Switch
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import ir.pricewidget.app.R
 import ir.pricewidget.app.data.ApiService
 import ir.pricewidget.app.data.GoldCurrencyResponse
@@ -385,17 +387,18 @@ fun DailySummaryLine(items: List<ir.pricewidget.app.data.PriceItem>) {
 @Composable
 fun HomeFeaturedPager(
     items: List<ir.pricewidget.app.data.PriceItem>,
+    intervalSeconds: Int = 7,
     onRemove: (String) -> Unit
 ) {
     if (items.isEmpty()) return
     val pagerState = rememberPagerState(pageCount = { items.size })
     val itemCount = items.size
 
-    // Auto-advance every 5 seconds, like a carousel banner.
-    LaunchedEffect(itemCount) {
+    // چرخش خودکار — بازه‌ش الان قابل‌تنظیمه (از صفحه‌ی تنظیمات)، دیگه هاردکد نیست.
+    LaunchedEffect(itemCount, intervalSeconds) {
         if (itemCount <= 1) return@LaunchedEffect
         while (true) {
-            kotlinx.coroutines.delay(7000)
+            kotlinx.coroutines.delay(intervalSeconds * 1000L)
             val next = (pagerState.currentPage + 1) % itemCount
             pagerState.animateScrollToPage(next)
         }
@@ -580,6 +583,54 @@ fun HomeGridCard(
         }
     }
 }
+
+@Composable
+fun HomeListRow(
+    priceItem: ir.pricewidget.app.data.PriceItem,
+    modifier: Modifier = Modifier,
+    onRemove: () -> Unit
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            ir.pricewidget.app.data.IconMap.flag(priceItem.symbol ?: priceItem.itemKey),
+            style = MaterialTheme.typography.titleMedium
+        )
+        Spacer(Modifier.width(10.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(priceItem.displayName, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Medium, maxLines = 1)
+            if (!priceItem.unit.isNullOrBlank()) {
+                Text(priceItem.unit, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
+            }
+        }
+        Column(horizontalAlignment = Alignment.End) {
+            RollingNumberText(
+                text = priceItem.priceValue?.let { PriceFormat.format(it) } ?: priceItem.price ?: "--",
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+            )
+            val pct = priceItem.changePercent
+            if (pct != null) {
+                Text(
+                    "${if (pct >= 0) "+" else ""}${"%.1f".format(java.util.Locale.US, pct)}%",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (pct >= 0) androidx.compose.ui.graphics.Color(0xFF32D74B) else androidx.compose.ui.graphics.Color(0xFFFF453A)
+                )
+            }
+        }
+        Spacer(Modifier.width(8.dp))
+        IconButton(onClick = onRemove, modifier = Modifier.size(28.dp)) {
+            Icon(Icons.Filled.Close, contentDescription = "حذف", modifier = Modifier.size(16.dp))
+        }
+    }
+}
+
 
 @Composable
 fun AddItemTile(modifier: Modifier = Modifier, onClick: () -> Unit) {
@@ -815,7 +866,7 @@ private fun defaultHomeKeys(allItems: List<Pair<String, ir.pricewidget.app.data.
     return DEFAULT_HOME_SYMBOLS.mapNotNull { bySymbol[it]?.itemKey }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun AppScreen() {
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -836,6 +887,16 @@ fun AppScreen() {
 
     var isDark by remember { mutableStateOf(false) }
     var widgetFollowSystem by remember { mutableStateOf(false) }
+    var currentScreen by remember { mutableStateOf("home") }
+    var headerInterval by remember { mutableStateOf(7) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val pullRefreshState = rememberPullToRefreshState()
+    if (pullRefreshState.isRefreshing) {
+        LaunchedEffect(true) {
+            refresh(hapticOnChange = true)
+            pullRefreshState.endRefresh()
+        }
+    }
     var notifEnabled by remember { mutableStateOf(false) }
     var limitMessage by remember { mutableStateOf<String?>(null) }
     var showOnboarding by remember { mutableStateOf(false) }
@@ -872,7 +933,28 @@ fun AppScreen() {
         val moved = mutable.removeAt(idx)
         mutable.add(newIdx, moved)
         homeItems = mutable
-        scope.launch { repo.setHomeItems(homeItems) }
+        WorkScheduler.saveHomeItems(context, homeItems)
+    }
+
+    fun removeHomeItemWithUndo(key: String) {
+        val idx = homeItems.indexOf(key)
+        if (idx < 0) return
+        val removedName = response?.allItems()?.firstOrNull { it.second.itemKey == key }?.second?.displayName ?: "آیتم"
+        homeItems = homeItems - key
+        WorkScheduler.saveHomeItems(context, homeItems)
+        scope.launch {
+            val result = snackbarHostState.showSnackbar(
+                message = "$removedName حذف شد",
+                actionLabel = "برگردون",
+                duration = SnackbarDuration.Short
+            )
+            if (result == SnackbarResult.ActionPerformed) {
+                val restored = homeItems.toMutableList()
+                restored.add(idx.coerceAtMost(restored.size), key)
+                homeItems = restored
+                WorkScheduler.saveHomeItems(context, homeItems)
+            }
+        }
     }
 
     LaunchedEffect(Unit) {
@@ -881,6 +963,7 @@ fun AppScreen() {
         isDark = repo.isDarkWidgetOnce()
         widgetFollowSystem = repo.isWidgetFollowSystemOnce()
         notifEnabled = repo.isNotificationEnabledOnce()
+        headerInterval = repo.getHeaderIntervalOnce()
 
         // بگ فیکس: اول کش رو نشون بده (اگه بود)، بعد صبر کن برای شبکه —
         // به‌جای این‌که کاربر تا جواب شبکه اسپینر ببینه حتی وقتی دیتای قدیمی داریم
@@ -908,7 +991,52 @@ fun AppScreen() {
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    if (pullRefreshState.isRefreshing) {
+        LaunchedEffect(true) {
+            refresh(hapticOnChange = true)
+            pullRefreshState.endRefresh()
+        }
+    }
+
+    if (currentScreen == "settings") {
+        SettingsScreen(
+            notifEnabled = notifEnabled,
+            onNotifToggle = { checked ->
+                if (checked) {
+                    notifEnabled = true
+                    scope.launch {
+                        repo.setNotificationEnabled(true)
+                        ir.pricewidget.app.notification.RateNotifier.show(context)
+                    }
+                } else {
+                    notifEnabled = false
+                    scope.launch { repo.setNotificationEnabled(false) }
+                    ir.pricewidget.app.notification.RateNotifier.cancel(context)
+                }
+            },
+            headerIntervalSeconds = headerInterval,
+            onHeaderIntervalChange = { seconds ->
+                headerInterval = seconds
+                scope.launch { repo.setHeaderInterval(seconds) }
+            },
+            onOpenWidgetDialog = {
+                currentScreen = "home"
+                scope.launch {
+                    widgetAlreadyPinned = GlanceAppWidgetManager(context)
+                        .getGlanceIds(PriceWidget::class.java)
+                        .isNotEmpty()
+                }
+                showWidgetDialog = true
+            },
+            onBack = { currentScreen = "home" }
+        )
+    } else {
+    Box(modifier = Modifier.fillMaxSize()) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .nestedScroll(pullRefreshState.nestedScrollConnection)
+    ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
@@ -955,6 +1083,12 @@ fun AppScreen() {
                 } else {
                     Icon(Icons.Filled.Refresh, contentDescription = "بروزرسانی", modifier = Modifier.size(18.dp))
                 }
+            }
+            IconButton(
+                onClick = { currentScreen = "settings" },
+                modifier = Modifier.size(28.dp)
+            ) {
+                Icon(Icons.Filled.Settings, contentDescription = "تنظیمات", modifier = Modifier.size(18.dp))
             }
         }
 
@@ -1041,7 +1175,7 @@ fun AppScreen() {
                                 Button(onClick = {
                                     val defaults = defaultHomeKeys(allItems)
                                     homeItems = defaults
-                                    scope.launch { repo.setHomeItems(defaults) }
+                                    WorkScheduler.saveHomeItems(context, defaults)
                                 }) {
                                     Text("افزودن دلار، یورو، طلای ۱۸ و بیت‌کوین")
                                 }
@@ -1065,10 +1199,8 @@ fun AppScreen() {
                         DailySummaryLine(homeList)
                         HomeFeaturedPager(
                             items = headerList,
-                            onRemove = { key ->
-                                homeItems = homeItems - key
-                                scope.launch { repo.setHomeItems(homeItems) }
-                            }
+                            intervalSeconds = headerInterval,
+                            onRemove = { key -> removeHomeItemWithUndo(key) }
                         )
                         LazyColumn(
                             modifier = Modifier.weight(1f).fillMaxWidth(),
@@ -1092,10 +1224,7 @@ fun AppScreen() {
                                             canMoveLater = idx in 0 until (homeItems.size - 1),
                                             onMoveEarlier = { moveHomeItem(priceItem.itemKey, -1) },
                                             onMoveLater = { moveHomeItem(priceItem.itemKey, 1) },
-                                            onRemove = {
-                                                homeItems = homeItems - priceItem.itemKey
-                                                scope.launch { repo.setHomeItems(homeItems) }
-                                            }
+                                            onRemove = { removeHomeItemWithUndo(priceItem.itemKey) }
                                         )
                                     }
                                     if (isLastRow && rowItems.size == 1) {
@@ -1330,6 +1459,16 @@ fun AppScreen() {
             }
         )
     }
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
+        PullToRefreshContainer(
+            state = pullRefreshState,
+            modifier = Modifier.align(Alignment.TopCenter)
+        )
+    }
+    }
 
     if (showManageDialog) {
         ManageItemsDialog(
@@ -1339,7 +1478,7 @@ fun AppScreen() {
             limitMessage = limitMessage,
             onToggleHome = { key, checked ->
                 homeItems = if (checked) homeItems + key else homeItems - key
-                scope.launch { repo.setHomeItems(homeItems) }
+                WorkScheduler.saveHomeItems(context, homeItems)
             },
             onToggleWidget = { key, checked ->
                 if (checked && selected.size >= 3) {
@@ -1347,10 +1486,7 @@ fun AppScreen() {
                 } else {
                     selected = if (checked) selected + key else selected - key
                     limitMessage = null
-                    scope.launch {
-                        repo.setSelectedItems(selected)
-                    }
-                    WorkScheduler.refreshWidgetNow(context)
+                    WorkScheduler.saveWidgetItems(context, selected)
                 }
             },
             onDismiss = { showManageDialog = false; limitMessage = null }
@@ -1375,11 +1511,7 @@ fun AppScreen() {
                 showWidgetDialog = false
                 isDark = dialogDark
                 widgetFollowSystem = dialogFollowSystem
-                scope.launch {
-                    repo.setWidgetDark(dialogDark)
-                    repo.setWidgetFollowSystem(dialogFollowSystem)
-                }
-                WorkScheduler.refreshWidgetNow(context)
+                WorkScheduler.saveWidgetTheme(context, dialogDark, dialogFollowSystem)
                 scope.launch {
                     val alreadyPinned = GlanceAppWidgetManager(context)
                         .getGlanceIds(PriceWidget::class.java)
@@ -1437,43 +1569,35 @@ fun WidgetSetupDialog(
         title = { Text(if (alreadyPinned) "ظاهر ویجت" else "ظاهر ویجت رو انتخاب کن") },
         text = {
             Column {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("پیرو تم سیستم", style = MaterialTheme.typography.bodyMedium)
-                    Switch(checked = followSystem, onCheckedChange = onFollowSystemChange)
-                }
-                Spacer(Modifier.height(8.dp))
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.alpha(if (followSystem) 0.4f else 1f)
-                ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     WidgetPreviewOption(
                         label = "روشن",
                         dark = false,
-                        selected = !isDark,
+                        selected = !followSystem && !isDark,
                         previewItem = previewItem,
                         modifier = Modifier.weight(1f),
-                        onClick = { if (!followSystem) onThemeChange(false) }
+                        onClick = {
+                            onFollowSystemChange(false)
+                            onThemeChange(false)
+                        }
                     )
                     WidgetPreviewOption(
                         label = "تیره",
                         dark = true,
-                        selected = isDark,
+                        selected = !followSystem && isDark,
                         previewItem = previewItem,
                         modifier = Modifier.weight(1f),
-                        onClick = { if (!followSystem) onThemeChange(true) }
+                        onClick = {
+                            onFollowSystemChange(false)
+                            onThemeChange(true)
+                        }
+                    )
+                    AutoThemeOption(
+                        selected = followSystem,
+                        modifier = Modifier.weight(1f),
+                        onClick = { onFollowSystemChange(true) }
                     )
                 }
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    if (followSystem) "ویجت خودش رو با تم روشن/تیره‌ی گوشیت هماهنگ می‌کنه"
-                    else "بعداً هم از همین صفحه می‌تونی تم رو عوض کنی",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                )
             }
         },
         confirmButton = {
