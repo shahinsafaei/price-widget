@@ -891,12 +891,6 @@ fun AppScreen() {
     var headerInterval by remember { mutableStateOf(7) }
     val snackbarHostState = remember { SnackbarHostState() }
     val pullRefreshState = rememberPullToRefreshState()
-    if (pullRefreshState.isRefreshing) {
-        LaunchedEffect(true) {
-            refresh(hapticOnChange = true)
-            pullRefreshState.endRefresh()
-        }
-    }
     var notifEnabled by remember { mutableStateOf(false) }
     var limitMessage by remember { mutableStateOf<String?>(null) }
     var showOnboarding by remember { mutableStateOf(false) }
