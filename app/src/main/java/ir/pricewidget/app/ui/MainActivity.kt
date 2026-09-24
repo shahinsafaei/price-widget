@@ -1591,6 +1591,7 @@ fun WidgetSetupDialog(
                         modifier = Modifier.weight(1f),
                         onClick = { onFollowSystemChange(true) }
                     )
+                    
                 }
             }
         },
@@ -1604,6 +1605,44 @@ fun WidgetSetupDialog(
         }
     )
 }
+
+
+
+@Composable
+private fun AutoThemeOption(
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(14.dp))
+            .then(
+                if (selected) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(14.dp))
+                else Modifier.border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f), RoundedCornerShape(14.dp))
+            )
+            .clickable { onClick() }
+            .padding(10.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(58.dp)
+                .clip(RoundedCornerShape(10.dp))
+        ) {
+            Box(Modifier.weight(1f).fillMaxHeight().background(androidx.compose.ui.graphics.Color(0xFFF2F2F7)))
+            Box(Modifier.weight(1f).fillMaxHeight().background(androidx.compose.ui.graphics.Color(0xFF17171A)))
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "خودکار",
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
 
 @Composable
 private fun WidgetPreviewOption(
