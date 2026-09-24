@@ -19,6 +19,7 @@ class PrefsRepository(private val context: Context) {
         val CACHED_JSON = stringPreferencesKey("cached_json")
         val LAST_UPDATED = stringPreferencesKey("last_updated")
         val WIDGET_DARK = androidx.datastore.preferences.core.booleanPreferencesKey("widget_dark")
+        val WIDGET_FOLLOW_SYSTEM = androidx.datastore.preferences.core.booleanPreferencesKey("widget_follow_system")
         val NOTIF_ENABLED = androidx.datastore.preferences.core.booleanPreferencesKey("notif_enabled")
         val ONBOARDED = androidx.datastore.preferences.core.booleanPreferencesKey("onboarded")
         val HOME_ITEMS_ORDER = stringPreferencesKey("home_items_order")
@@ -70,6 +71,14 @@ class PrefsRepository(private val context: Context) {
 
     suspend fun isDarkWidgetOnce(): Boolean = isDarkWidgetFlow.first()
 
+    val widgetFollowSystemFlow: Flow<Boolean> = context.dataStore.data.map { it[Keys.WIDGET_FOLLOW_SYSTEM] ?: false }
+
+    suspend fun setWidgetFollowSystem(follow: Boolean) {
+        context.dataStore.edit { it[Keys.WIDGET_FOLLOW_SYSTEM] = follow }
+    }
+
+    suspend fun isWidgetFollowSystemOnce(): Boolean = widgetFollowSystemFlow.first()
+
     val notificationEnabledFlow: Flow<Boolean> = context.dataStore.data.map { it[Keys.NOTIF_ENABLED] ?: false }
 
     suspend fun setNotificationEnabled(enabled: Boolean) {
@@ -91,4 +100,5 @@ class PrefsRepository(private val context: Context) {
 
     suspend fun getSelectedItemsOnce(): Set<String> = selectedItemsFlow.first()
     suspend fun getCachedOnce(): GoldCurrencyResponse? = cachedResponseFlow.first()
+    suspend fun getLastUpdatedOnce(): String? = lastUpdatedFlow.first()
 }

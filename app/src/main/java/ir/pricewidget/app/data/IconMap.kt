@@ -10,7 +10,7 @@ object IconMap {
         symbol == null -> null
         symbol.contains("XAU") -> null // gold ounce — not a currency flag
         symbol.contains("GOLD") || symbol.contains("COIN") -> null
-        symbol.contains("USD") && !symbol.contains("USDT") -> R.drawable.flag_us
+        symbol.contains("USD") && !symbol.contains("USDT") && !symbol.contains("USDC") -> R.drawable.flag_us
         symbol.contains("EUR") -> R.drawable.flag_eu
         symbol.contains("GBP") -> R.drawable.flag_gb
         symbol.contains("AED") -> R.drawable.flag_ae
@@ -46,6 +46,7 @@ object IconMap {
         symbol.contains("GOLD") -> "🪙"
         symbol.contains("COIN") -> "🪙"
         symbol.contains("USDT") -> "₮"
+        symbol.contains("USDC") -> "🪙"
         symbol.contains("USD") -> "🇺🇸"
         symbol.contains("EUR") -> "🇪🇺"
         symbol.contains("GBP") -> "🇬🇧"

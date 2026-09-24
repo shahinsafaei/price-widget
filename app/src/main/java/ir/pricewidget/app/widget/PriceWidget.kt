@@ -79,7 +79,7 @@ private fun formatWidgetPrice(item: PriceItem): String {
     val raw = if (v >= 1_000_000) {
         "%,dm".format(java.util.Locale.US, Math.round(v / 1000.0))
     } else {
-        "%,.0f".format(java.util.Locale.US, v)
+        PriceFormat.format(v)
     }
     return "$LRI$raw$PDI"
 }
@@ -113,7 +113,14 @@ class PriceWidget : GlanceAppWidget() {
         val repo = PrefsRepository(context)
         val selected = repo.getSelectedItemsOnce()
         val cached = repo.getCachedOnce()
-        val dark = repo.isDarkWidgetOnce()
+        val followSystem = repo.isWidgetFollowSystemOnce()
+        val dark = if (followSystem) {
+            val uiMode = context.resources.configuration.uiMode and
+                android.content.res.Configuration.UI_MODE_NIGHT_MASK
+            uiMode == android.content.res.Configuration.UI_MODE_NIGHT_YES
+        } else {
+            repo.isDarkWidgetOnce()
+        }
 
         provideContent {
             WidgetContent(cached, selected, if (dark) DarkPalette else LightPalette)
@@ -189,6 +196,13 @@ class PriceWidget : GlanceAppWidget() {
                     style = TextStyle(color = ColorProvider(palette.textPrimary), fontSize = 24.sp, fontWeight = FontWeight.Bold),
                     maxLines = 1
                 )
+                if (!item.unit.isNullOrBlank()) {
+                    Text(
+                        item.unit,
+                        style = TextStyle(color = ColorProvider(palette.textSecondary), fontSize = 11.sp),
+                        maxLines = 1
+                    )
+                }
             }
         }
     }

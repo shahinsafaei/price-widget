@@ -47,15 +47,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.material3.Switch
 import ir.pricewidget.app.R
 import ir.pricewidget.app.data.ApiService
 import ir.pricewidget.app.data.GoldCurrencyResponse
 import ir.pricewidget.app.data.PrefsRepository
+import ir.pricewidget.app.data.PriceFormat
 import ir.pricewidget.app.widget.PriceWidget
 import ir.pricewidget.app.widget.PriceWidgetReceiver
 import ir.pricewidget.app.work.WorkScheduler
 import kotlinx.coroutines.launch
 import java.util.Locale
+
 
 
 class MainActivity : ComponentActivity() {
@@ -229,10 +232,21 @@ fun FeaturedPriceCard(
                         )
                     }
                     Spacer(Modifier.height(8.dp))
-                    RollingNumberText(
-                        text = item.priceValue?.let { "%,.0f".format(Locale.US, it) } ?: item.price ?: "--",
-                        style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold)
-                    )
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        RollingNumberText(
+                            text = item.priceValue?.let { PriceFormat.format(it) } ?: item.price ?: "--",
+                            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold)
+                        )
+                        if (!item.unit.isNullOrBlank()) {
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                item.unit,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                                modifier = Modifier.padding(bottom = 4.dp)
+                            )
+                        }
+                    }
                 }
                 // Flag lives entirely on the other side (left), in its own lane
                 // — no separate background, just the glyph.
@@ -332,7 +346,7 @@ fun PriceCard(
             )
         }
         RollingNumberText(
-            text = priceItem.priceValue?.let { "%,.0f".format(Locale.US, it) } ?: priceItem.price ?: "--",
+            text = priceItem.priceValue?.let { PriceFormat.format(it) } ?: priceItem.price ?: "--",
             style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
         )
     }
@@ -518,9 +532,17 @@ fun HomeGridCard(
             )
         }
         RollingNumberText(
-            text = priceItem.priceValue?.let { "%,.0f".format(Locale.US, it) } ?: priceItem.price ?: "--",
+            text = priceItem.priceValue?.let { PriceFormat.format(it) } ?: priceItem.price ?: "--",
             style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold)
         )
+        if (!priceItem.unit.isNullOrBlank()) {
+            Text(
+                priceItem.unit,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                maxLines = 1
+            )
+        }
         Spacer(Modifier.height(5.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -741,7 +763,7 @@ private fun ManageItemRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(priceItem.displayName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
             Text(
-                priceItem.priceValue?.let { "%,.0f".format(Locale.US, it) } ?: priceItem.price ?: "--",
+                priceItem.priceValue?.let { PriceFormat.format(it) } ?: priceItem.price ?: "--",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
             )
@@ -761,10 +783,18 @@ private fun isMarketOpenNow(): Boolean {
 
 /** "1405/07/01 16:50" — Jalali date + time, Latin digits, via ICU (available since API 24).
  *  Falls back to a plain Gregorian HH:mm if ICU's Persian calendar isn't available on this
- *  device/ROM, so a broken ICU implementation never crashes the app. */
-private fun persianDateTimeNowLabel(): String {
+ *  device/ROM, so a broken ICU implementation never crashes the app.
+ *
+ *  Bug fix: this used to always format "right now" (device clock), so a stale
+ *  cached/GitHub-fetched response would still show "just updated". Pass the
+ *  data's own time_unix (epoch seconds) so the label reflects when the DATA
+ *  was actually generated, not when the app happened to render it. */
+private fun persianDateTimeLabel(epochSeconds: Long? = null): String {
     return try {
         val cal = android.icu.util.Calendar.getInstance(android.icu.util.ULocale.forLanguageTag("fa-u-ca-persian"))
+        if (epochSeconds != null) {
+            cal.timeInMillis = epochSeconds * 1000L
+        }
         val year = cal.get(android.icu.util.Calendar.YEAR)
         val month = cal.get(android.icu.util.Calendar.MONTH) + 1
         val day = cal.get(android.icu.util.Calendar.DAY_OF_MONTH)
@@ -772,7 +802,8 @@ private fun persianDateTimeNowLabel(): String {
         val minute = cal.get(android.icu.util.Calendar.MINUTE)
         "%d/%02d/%02d %02d:%02d".format(java.util.Locale.US, year, month, day, hour, minute)
     } catch (e: Exception) {
-        java.text.SimpleDateFormat("HH:mm", java.util.Locale.US).format(java.util.Date())
+        val date = if (epochSeconds != null) java.util.Date(epochSeconds * 1000L) else java.util.Date()
+        java.text.SimpleDateFormat("HH:mm", java.util.Locale.US).format(date)
     }
 }
 
@@ -798,11 +829,13 @@ fun AppScreen() {
     var loading by remember { mutableStateOf(true) }
     var refreshing by remember { mutableStateOf(false) }
     var showWidgetDialog by remember { mutableStateOf(false) }
+    var widgetAlreadyPinned by remember { mutableStateOf(false) }
     var showManageDialog by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var lastUpdated by remember { mutableStateOf<String?>(null) }
 
     var isDark by remember { mutableStateOf(false) }
+    var widgetFollowSystem by remember { mutableStateOf(false) }
     var notifEnabled by remember { mutableStateOf(false) }
     var limitMessage by remember { mutableStateOf<String?>(null) }
     var showOnboarding by remember { mutableStateOf(false) }
@@ -813,7 +846,9 @@ fun AppScreen() {
             val previousPrices = response?.allItems()?.associate { it.second.itemKey to it.second.price }
             val result = ApiService.create().getGoldCurrency()
             response = result
-            val now = persianDateTimeNowLabel()
+            // زمان واقعی داده (نه لحظه‌ی الان گوشی): جدیدترین time_unix بین همه‌ی آیتم‌ها
+            val freshestEpoch = result.allItems().mapNotNull { it.second.timeUnix }.maxOrNull()
+            val now = persianDateTimeLabel(freshestEpoch)
             repo.saveCache(result, now)
             lastUpdated = now
             error = null
@@ -844,7 +879,18 @@ fun AppScreen() {
         selected = repo.getSelectedItemsOnce()
         homeItems = repo.getHomeItemsOnce()
         isDark = repo.isDarkWidgetOnce()
+        widgetFollowSystem = repo.isWidgetFollowSystemOnce()
         notifEnabled = repo.isNotificationEnabledOnce()
+
+        // بگ فیکس: اول کش رو نشون بده (اگه بود)، بعد صبر کن برای شبکه —
+        // به‌جای این‌که کاربر تا جواب شبکه اسپینر ببینه حتی وقتی دیتای قدیمی داریم
+        val cached = repo.getCachedOnce()
+        if (cached != null) {
+            response = cached
+            lastUpdated = repo.getLastUpdatedOnce()
+            loading = false
+        }
+
         refresh()
         if (notifEnabled) ir.pricewidget.app.notification.RateNotifier.show(context)
         loading = false
@@ -1173,7 +1219,14 @@ fun AppScreen() {
                         .clip(RoundedCornerShape(14.dp))
                         .background(MaterialTheme.colorScheme.surface)
                         .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), RoundedCornerShape(14.dp))
-                        .clickable { showWidgetDialog = true }
+                        .clickable {
+                            scope.launch {
+                                widgetAlreadyPinned = GlanceAppWidgetManager(context)
+                                    .getGlanceIds(ir.pricewidget.app.widget.PriceWidget::class.java)
+                                    .isNotEmpty()
+                            }
+                            showWidgetDialog = true
+                        }
                         .padding(horizontal = 12.dp, vertical = 10.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
@@ -1306,15 +1359,25 @@ fun AppScreen() {
 
     if (showWidgetDialog) {
         var dialogDark by remember { mutableStateOf(isDark) }
+        var dialogFollowSystem by remember { mutableStateOf(widgetFollowSystem) }
+        val previewItem = response?.allItems()
+            ?.map { it.second }
+            ?.firstOrNull { it.itemKey in selected }
         WidgetSetupDialog(
+            alreadyPinned = widgetAlreadyPinned,
+            previewItem = previewItem,
             isDark = dialogDark,
+            followSystem = dialogFollowSystem,
             onThemeChange = { dark -> dialogDark = dark },
+            onFollowSystemChange = { follow -> dialogFollowSystem = follow },
             onDismiss = { showWidgetDialog = false },
             onConfirm = {
                 showWidgetDialog = false
                 isDark = dialogDark
+                widgetFollowSystem = dialogFollowSystem
                 scope.launch {
                     repo.setWidgetDark(dialogDark)
+                    repo.setWidgetFollowSystem(dialogFollowSystem)
                 }
                 WorkScheduler.refreshWidgetNow(context)
                 scope.launch {
@@ -1360,42 +1423,63 @@ fun AppScreen() {
 
 @Composable
 fun WidgetSetupDialog(
+    alreadyPinned: Boolean,
+    previewItem: ir.pricewidget.app.data.PriceItem?,
     isDark: Boolean,
+    followSystem: Boolean,
     onThemeChange: (Boolean) -> Unit,
+    onFollowSystemChange: (Boolean) -> Unit,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("ظاهر ویجت رو انتخاب کن") },
+        title = { Text(if (alreadyPinned) "ظاهر ویجت" else "ظاهر ویجت رو انتخاب کن") },
         text = {
             Column {
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("پیرو تم سیستم", style = MaterialTheme.typography.bodyMedium)
+                    Switch(checked = followSystem, onCheckedChange = onFollowSystemChange)
+                }
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.alpha(if (followSystem) 0.4f else 1f)
+                ) {
                     WidgetPreviewOption(
                         label = "روشن",
                         dark = false,
                         selected = !isDark,
+                        previewItem = previewItem,
                         modifier = Modifier.weight(1f),
-                        onClick = { onThemeChange(false) }
+                        onClick = { if (!followSystem) onThemeChange(false) }
                     )
                     WidgetPreviewOption(
                         label = "تیره",
                         dark = true,
                         selected = isDark,
+                        previewItem = previewItem,
                         modifier = Modifier.weight(1f),
-                        onClick = { onThemeChange(true) }
+                        onClick = { if (!followSystem) onThemeChange(true) }
                     )
                 }
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "بعداً هم از همین صفحه می‌تونی تم رو عوض کنی",
+                    if (followSystem) "ویجت خودش رو با تم روشن/تیره‌ی گوشیت هماهنگ می‌کنه"
+                    else "بعداً هم از همین صفحه می‌تونی تم رو عوض کنی",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                 )
             }
         },
         confirmButton = {
-            TextButton(onClick = onConfirm) { Text("افزودن ویجت") }
+            TextButton(onClick = onConfirm) {
+                Text(if (alreadyPinned) "ذخیره تغییرات" else "افزودن ویجت")
+            }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("انصراف") }
@@ -1408,12 +1492,19 @@ private fun WidgetPreviewOption(
     label: String,
     dark: Boolean,
     selected: Boolean,
+    previewItem: ir.pricewidget.app.data.PriceItem?,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
     val bg = if (dark) androidx.compose.ui.graphics.Color(0xFF17171A) else androidx.compose.ui.graphics.Color(0xFFF2F2F7)
     val cardBg = if (dark) androidx.compose.ui.graphics.Color(0xFF2C2C2E) else androidx.compose.ui.graphics.Color.White
     val textColor = if (dark) androidx.compose.ui.graphics.Color.White else androidx.compose.ui.graphics.Color(0xFF1C1C1E)
+
+    val previewName = previewItem?.displayName ?: "دلار"
+    val previewPct = previewItem?.changePercent
+    val previewPctText = if (previewPct != null) "${if (previewPct >= 0) "+" else ""}${"%.1f".format(java.util.Locale.US, previewPct)}%" else "+1.2%"
+    val previewPctColor = if (previewPct == null || previewPct >= 0) androidx.compose.ui.graphics.Color(0xFF32D74B) else androidx.compose.ui.graphics.Color(0xFFFF453A)
+    val previewPrice = previewItem?.priceValue?.let { ir.pricewidget.app.data.PriceFormat.format(it) } ?: previewItem?.price ?: "235,975"
 
     Column(
         modifier = modifier
@@ -1433,9 +1524,9 @@ private fun WidgetPreviewOption(
                 .background(cardBg)
                 .padding(8.dp)
         ) {
-            Text("دلار", style = MaterialTheme.typography.labelSmall, color = textColor)
-            Text("+1.2%", style = MaterialTheme.typography.labelSmall, color = androidx.compose.ui.graphics.Color(0xFF32D74B))
-            Text("235,975", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = textColor)
+            Text(previewName, style = MaterialTheme.typography.labelSmall, color = textColor, maxLines = 1)
+            Text(previewPctText, style = MaterialTheme.typography.labelSmall, color = previewPctColor)
+            Text(previewPrice, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = textColor, maxLines = 1)
         }
         Spacer(Modifier.height(6.dp))
         Text(label, style = MaterialTheme.typography.labelMedium, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)

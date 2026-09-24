@@ -19,7 +19,8 @@ data class PriceItem(
     @SerializedName("change_percent") val changePercent: Double? = null,
     @SerializedName("unit") val unit: String? = null,
     @SerializedName("date") val date: String? = null,
-    @SerializedName("time") val time: String? = null
+    @SerializedName("time") val time: String? = null,
+    @SerializedName("time_unix") val timeUnix: Long? = null
 ) {
     /** Unique key used to identify this item across app + widget settings */
     val itemKey: String
