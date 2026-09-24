@@ -666,13 +666,9 @@ fun AddItemTile(modifier: Modifier = Modifier, onClick: () -> Unit) {
 fun ManageItemsDialog(
     allItems: List<Pair<String, ir.pricewidget.app.data.PriceItem>>,
     homeItems: List<String>,
-    widgetItems: Set<String>,
-    limitMessage: String?,
     onToggleHome: (String, Boolean) -> Unit,
-    onToggleWidget: (String, Boolean) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var selectedTab by remember { mutableStateOf(0) }
     var selectedCategory by remember { mutableStateOf<String?>(null) }
     var query by remember { mutableStateOf("") }
     val categories = allItems.map { it.first }.distinct()
@@ -696,20 +692,7 @@ fun ManageItemsDialog(
                     }
                 }
 
-                TabRow(selectedTabIndex = selectedTab) {
-                    Tab(
-                        selected = selectedTab == 0,
-                        onClick = { selectedTab = 0 },
-                        text = { Text("صفحه اصلی (${homeItems.size})") }
-                    )
-                    Tab(
-                        selected = selectedTab == 1,
-                        onClick = { selectedTab = 1 },
-                        text = { Text("ویجت (${widgetItems.size}/3)") }
-                    )
-                }
-
-                OutlinedTextField(
+                if (categories.size > 1) {
                     value = query,
                     onValueChange = { query = it },
                     placeholder = { Text("جستجو…", style = MaterialTheme.typography.bodySmall) },
@@ -765,22 +748,12 @@ fun ManageItemsDialog(
                             )
                         }
                         items(categoryItems) { (_, priceItem) ->
-                            if (selectedTab == 0) {
-                                ManageItemRow(
-                                    priceItem = priceItem,
-                                    checked = priceItem.itemKey in homeItems,
-                                    enabled = true,
-                                    onToggle = { checked -> onToggleHome(priceItem.itemKey, checked) }
-                                )
-                            } else {
-                                val inWidget = priceItem.itemKey in widgetItems
-                                ManageItemRow(
-                                    priceItem = priceItem,
-                                    checked = inWidget,
-                                    enabled = widgetItems.size < 3 || inWidget,
-                                    onToggle = { checked -> onToggleWidget(priceItem.itemKey, checked) }
-                                )
-                            }
+                            ManageItemRow(
+                                priceItem = priceItem,
+                                checked = priceItem.itemKey in homeItems,
+                                enabled = true,
+                                onToggle = { checked -> onToggleHome(priceItem.itemKey, checked) }
+                            )
                         }
                     }
                     item { Spacer(Modifier.height(12.dp)) }
@@ -1452,36 +1425,27 @@ fun AppScreen() {
 
     if (showManageDialog) {
         ManageItemsDialog(
-            allItems = response?.allItems() ?: emptyList(),
+            allItems = allItems,
             homeItems = homeItems,
-            widgetItems = selected,
-            limitMessage = limitMessage,
             onToggleHome = { key, checked ->
                 homeItems = if (checked) homeItems + key else homeItems - key
                 WorkScheduler.saveHomeItems(context, homeItems)
             },
-            onToggleWidget = { key, checked ->
-                if (checked && selected.size >= 3) {
-                    limitMessage = "حداکثر ۳ آیتم برای ویجت قابل انتخابه"
-                } else {
-                    selected = if (checked) selected + key else selected - key
-                    limitMessage = null
-                    WorkScheduler.saveWidgetItems(context, selected)
-                }
-            },
-            onDismiss = { showManageDialog = false; limitMessage = null }
+            onDismiss = { showManageDialog = false }
         )
     }
 
     if (showWidgetDialog) {
         var dialogDark by remember { mutableStateOf(isDark) }
         var dialogFollowSystem by remember { mutableStateOf(widgetFollowSystem) }
-        val previewItem = response?.allItems()
-            ?.map { it.second }
-            ?.firstOrNull { it.itemKey in selected }
-        WidgetSetupDialog(
+        var dialogSelected by remember { mutableStateOf(selected) }
+        WidgetConfigDialog(
             alreadyPinned = widgetAlreadyPinned,
-            previewItem = previewItem,
+            allItems = response?.allItems() ?: emptyList(),
+            selectedItems = dialogSelected,
+            onToggleItem = { key, checked ->
+                dialogSelected = if (checked) dialogSelected + key else dialogSelected - key
+            },
             isDark = dialogDark,
             followSystem = dialogFollowSystem,
             onThemeChange = { dark -> dialogDark = dark },
@@ -1491,7 +1455,9 @@ fun AppScreen() {
                 showWidgetDialog = false
                 isDark = dialogDark
                 widgetFollowSystem = dialogFollowSystem
+                selected = dialogSelected
                 WorkScheduler.saveWidgetTheme(context, dialogDark, dialogFollowSystem)
+                WorkScheduler.saveWidgetItems(context, dialogSelected)
                 scope.launch {
                     val alreadyPinned = GlanceAppWidgetManager(context)
                         .getGlanceIds(PriceWidget::class.java)
@@ -1534,9 +1500,11 @@ fun AppScreen() {
 }
 
 @Composable
-fun WidgetSetupDialog(
+fun WidgetConfigDialog(
     alreadyPinned: Boolean,
-    previewItem: ir.pricewidget.app.data.PriceItem?,
+    allItems: List<Pair<String, ir.pricewidget.app.data.PriceItem>>,
+    selectedItems: Set<String>,
+    onToggleItem: (String, Boolean) -> Unit,
     isDark: Boolean,
     followSystem: Boolean,
     onThemeChange: (Boolean) -> Unit,
@@ -1544,52 +1512,147 @@ fun WidgetSetupDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(if (alreadyPinned) "ظاهر ویجت" else "ظاهر ویجت رو انتخاب کن") },
-        text = {
-            Column {
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    WidgetPreviewOption(
-                        label = "روشن",
-                        dark = false,
-                        selected = !followSystem && !isDark,
-                        previewItem = previewItem,
-                        modifier = Modifier.weight(1f),
-                        onClick = {
-                            onFollowSystemChange(false)
-                            onThemeChange(false)
+    var query by remember { mutableStateOf("") }
+    val categories = allItems.map { it.first }.distinct()
+    var selectedCategory by remember { mutableStateOf<String?>(null) }
+    val previewItem = allItems.map { it.second }.firstOrNull { it.itemKey in selectedItems }
+
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("تنظیم ویجت", style = MaterialTheme.typography.titleLarge)
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Filled.Close, contentDescription = "بستن")
+                    }
+                }
+
+                Column(modifier = Modifier.padding(horizontal = 20.dp)) {
+                    Text("تم ویجت", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(8.dp))
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Max)
+                    ) {
+                        WidgetPreviewOption(
+                            label = "روشن",
+                            dark = false,
+                            selected = !followSystem && !isDark,
+                            previewItem = previewItem,
+                            modifier = Modifier.weight(1f).fillMaxHeight(),
+                            onClick = { onFollowSystemChange(false); onThemeChange(false) }
+                        )
+                        WidgetPreviewOption(
+                            label = "تیره",
+                            dark = true,
+                            selected = !followSystem && isDark,
+                            previewItem = previewItem,
+                            modifier = Modifier.weight(1f).fillMaxHeight(),
+                            onClick = { onFollowSystemChange(false); onThemeChange(true) }
+                        )
+                        AutoThemeOption(
+                            selected = followSystem,
+                            modifier = Modifier.weight(1f).fillMaxHeight(),
+                            onClick = { onFollowSystemChange(true) }
+                        )
+                    }
+
+                    Spacer(Modifier.height(20.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("آیتم‌های ویجت", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                        Text(
+                            "${selectedItems.size}/3",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = if (selectedItems.size >= 3) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+                    }
+                }
+
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    placeholder = { Text("جستجو…", style = MaterialTheme.typography.bodySmall) },
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodyMedium,
+                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 8.dp)
+                        .height(52.dp)
+                )
+
+                if (categories.size > 1) {
+                    LazyRowCategoryChips(
+                        categories = categories,
+                        selected = selectedCategory,
+                        onSelect = { selectedCategory = it }
+                    )
+                }
+
+                LazyColumn(
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val grouped = allItems
+                        .filter { selectedCategory == null || it.first == selectedCategory }
+                        .filter { query.isBlank() || it.second.displayName.contains(query, ignoreCase = true) }
+                        .groupBy { it.first }
+                    grouped.forEach { (category, categoryItems) ->
+                        item {
+                            val icon = when (category) {
+                                "طلا و سکه" -> "🪙"
+                                "ارز" -> "💵"
+                                "ارز دیجیتال" -> "₿"
+                                else -> "📊"
+                            }
+                            Text(
+                                "$icon $category",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(top = 10.dp, bottom = 4.dp, start = 4.dp)
+                            )
                         }
-                    )
-                    WidgetPreviewOption(
-                        label = "تیره",
-                        dark = true,
-                        selected = !followSystem && isDark,
-                        previewItem = previewItem,
-                        modifier = Modifier.weight(1f),
-                        onClick = {
-                            onFollowSystemChange(false)
-                            onThemeChange(true)
+                        items(categoryItems) { (_, priceItem) ->
+                            val inWidget = priceItem.itemKey in selectedItems
+                            ManageItemRow(
+                                priceItem = priceItem,
+                                checked = inWidget,
+                                enabled = selectedItems.size < 3 || inWidget,
+                                onToggle = { checked -> onToggleItem(priceItem.itemKey, checked) }
+                            )
                         }
-                    )
-                    AutoThemeOption(
-                        selected = followSystem,
-                        modifier = Modifier.weight(1f),
-                        onClick = { onFollowSystemChange(true) }
-                    )
-                    
+                    }
+                    item { Spacer(Modifier.height(80.dp)) }
+                }
+
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.surface,
+                    shadowElevation = 8.dp
+                ) {
+                    Button(
+                        onClick = onConfirm,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        enabled = selectedItems.isNotEmpty()
+                    ) {
+                        Text(if (alreadyPinned) "ذخیره تغییرات" else "افزودن ویجت")
+                    }
                 }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text(if (alreadyPinned) "ذخیره تغییرات" else "افزودن ویجت")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("انصراف") }
         }
-    )
+    }
 }
 
 
