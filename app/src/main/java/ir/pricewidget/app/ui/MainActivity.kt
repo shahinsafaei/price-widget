@@ -890,7 +890,6 @@ fun AppScreen() {
     var currentScreen by remember { mutableStateOf("home") }
     var headerInterval by remember { mutableStateOf(7) }
     val snackbarHostState = remember { SnackbarHostState() }
-    val pullRefreshState = rememberPullToRefreshState()
     var notifEnabled by remember { mutableStateOf(false) }
     var limitMessage by remember { mutableStateOf<String?>(null) }
     var showOnboarding by remember { mutableStateOf(false) }
@@ -985,13 +984,6 @@ fun AppScreen() {
         }
     }
 
-    if (pullRefreshState.isRefreshing) {
-        LaunchedEffect(true) {
-            refresh(hapticOnChange = true)
-            pullRefreshState.endRefresh()
-        }
-    }
-
     if (currentScreen == "settings") {
         SettingsScreen(
             notifEnabled = notifEnabled,
@@ -1027,9 +1019,7 @@ fun AppScreen() {
     } else {
     Box(modifier = Modifier.fillMaxSize()) {
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .nestedScroll(pullRefreshState.nestedScrollConnection)
+        modifier = Modifier.fillMaxSize()
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -1456,10 +1446,6 @@ fun AppScreen() {
         SnackbarHost(
             hostState = snackbarHostState,
             modifier = Modifier.align(Alignment.BottomCenter)
-        )
-        PullToRefreshContainer(
-            state = pullRefreshState,
-            modifier = Modifier.align(Alignment.TopCenter)
         )
     }
     }
