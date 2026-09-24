@@ -37,6 +37,7 @@ import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import ir.pricewidget.app.data.GoldCurrencyResponse
 import ir.pricewidget.app.data.PrefsRepository
+import ir.pricewidget.app.data.PriceFormat
 import ir.pricewidget.app.data.PriceItem
 
 private data class Palette(
