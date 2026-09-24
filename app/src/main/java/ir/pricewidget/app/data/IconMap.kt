@@ -76,7 +76,6 @@ object IconMap {
         symbol.contains("SYP") -> "🇸🇾"
         symbol.contains("BTC") -> "₿"
         symbol.contains("ETH") -> "Ξ"
-        symbol.contains("USDC") -> "🪙"
         symbol.contains("XRP") -> "✕"
         symbol.contains("BNB") -> "🔶"
         symbol.contains("SOL") -> "◎"
