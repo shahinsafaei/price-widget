@@ -22,6 +22,7 @@ class PrefsRepository(private val context: Context) {
         val WIDGET_FOLLOW_SYSTEM = androidx.datastore.preferences.core.booleanPreferencesKey("widget_follow_system")
         val HEADER_INTERVAL = androidx.datastore.preferences.core.intPreferencesKey("header_interval_seconds")
         val HOME_VIEW_MODE = androidx.datastore.preferences.core.stringPreferencesKey("home_view_mode")
+        val HEADER_ITEM_COUNT = androidx.datastore.preferences.core.intPreferencesKey("header_item_count")
         val NOTIF_ENABLED = androidx.datastore.preferences.core.booleanPreferencesKey("notif_enabled")
         val ONBOARDED = androidx.datastore.preferences.core.booleanPreferencesKey("onboarded")
         val HOME_ITEMS_ORDER = stringPreferencesKey("home_items_order")
@@ -92,6 +93,12 @@ class PrefsRepository(private val context: Context) {
         context.dataStore.edit { it[Keys.HOME_VIEW_MODE] = mode }
     }
     suspend fun getHomeViewModeOnce(): String = homeViewModeFlow.first()
+
+    val headerItemCountFlow: Flow<Int> = context.dataStore.data.map { it[Keys.HEADER_ITEM_COUNT] ?: 3 }
+    suspend fun setHeaderItemCount(count: Int) {
+        context.dataStore.edit { it[Keys.HEADER_ITEM_COUNT] = count }
+    }
+    suspend fun getHeaderItemCountOnce(): Int = headerItemCountFlow.first()
 
     val notificationEnabledFlow: Flow<Boolean> = context.dataStore.data.map { it[Keys.NOTIF_ENABLED] ?: false }
 

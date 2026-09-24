@@ -862,6 +862,8 @@ fun AppScreen() {
     var widgetFollowSystem by remember { mutableStateOf(false) }
     var currentScreen by remember { mutableStateOf("home") }
     var headerInterval by remember { mutableStateOf(7) }
+    var headerItemCount by remember { mutableStateOf(3) }
+    var homeViewMode by remember { mutableStateOf("grid") }
     val snackbarHostState = remember { SnackbarHostState() }
     var notifEnabled by remember { mutableStateOf(false) }
     var limitMessage by remember { mutableStateOf<String?>(null) }
@@ -930,6 +932,8 @@ fun AppScreen() {
         widgetFollowSystem = repo.isWidgetFollowSystemOnce()
         notifEnabled = repo.isNotificationEnabledOnce()
         headerInterval = repo.getHeaderIntervalOnce()
+        headerItemCount = repo.getHeaderItemCountOnce()
+        homeViewMode = repo.getHomeViewModeOnce()
 
         // بگ فیکس: اول کش رو نشون بده (اگه بود)، بعد صبر کن برای شبکه —
         // به‌جای این‌که کاربر تا جواب شبکه اسپینر ببینه حتی وقتی دیتای قدیمی داریم
@@ -959,33 +963,19 @@ fun AppScreen() {
 
     if (currentScreen == "settings") {
         SettingsScreen(
-            notifEnabled = notifEnabled,
-            onNotifToggle = { checked ->
-                if (checked) {
-                    notifEnabled = true
-                    scope.launch {
-                        repo.setNotificationEnabled(true)
-                        ir.pricewidget.app.notification.RateNotifier.show(context)
-                    }
-                } else {
-                    notifEnabled = false
-                    scope.launch { repo.setNotificationEnabled(false) }
-                    ir.pricewidget.app.notification.RateNotifier.cancel(context)
-                }
-            },
             headerIntervalSeconds = headerInterval,
-            onHeaderIntervalChange = { seconds ->
-                headerInterval = seconds
-                scope.launch { repo.setHeaderInterval(seconds) }
-            },
-            onOpenWidgetDialog = {
-                currentScreen = "home"
+            headerItemCount = headerItemCount,
+            homeViewMode = homeViewMode,
+            onSave = { interval, count, viewMode ->
+                headerInterval = interval
+                headerItemCount = count
+                homeViewMode = viewMode
                 scope.launch {
-                    widgetAlreadyPinned = GlanceAppWidgetManager(context)
-                        .getGlanceIds(PriceWidget::class.java)
-                        .isNotEmpty()
+                    repo.setHeaderInterval(interval)
+                    repo.setHeaderItemCount(count)
+                    repo.setHomeViewMode(viewMode)
                 }
-                showWidgetDialog = true
+                currentScreen = "home"
             },
             onBack = { currentScreen = "home" }
         )
@@ -1148,9 +1138,9 @@ fun AppScreen() {
                         // watchlist lives only in the grid below, so nothing is
                         // duplicated between header and grid.
                         val widgetInHome = homeItems.filter { it in selected }
-                        val headerKeys = if (widgetInHome.isNotEmpty()) widgetInHome else homeItems.take(3)
+                        val headerKeys = if (widgetInHome.isNotEmpty()) widgetInHome else homeItems.take(headerItemCount)
                         var headerList = homeList.filter { it.itemKey in headerKeys }
-                        if (headerList.isEmpty()) headerList = homeList.take(3)
+                        if (headerList.isEmpty()) headerList = homeList.take(headerItemCount)
                         val gridList = homeList.filter { it !in headerList }
 
                         DailySummaryLine(homeList)
@@ -1159,54 +1149,76 @@ fun AppScreen() {
                             intervalSeconds = headerInterval,
                             onRemove = { key -> removeHomeItemWithUndo(key) }
                         )
-                        LazyColumn(
-                            modifier = Modifier.weight(1f).fillMaxWidth(),
-                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            val rows = gridList.chunked(2)
-                            val lastRowHasSpace = rows.isEmpty() || rows.last().size < 2
-                            itemsIndexed(rows) { rowIndex, rowItems ->
-                                val isLastRow = rowIndex == rows.lastIndex
-                                Row(
-                                    modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    rowItems.forEach { priceItem ->
-                                        val idx = homeItems.indexOf(priceItem.itemKey)
-                                        HomeGridCard(
-                                            priceItem = priceItem,
-                                            modifier = Modifier.weight(1f).fillMaxHeight(),
-                                            canMoveEarlier = idx > 0,
-                                            canMoveLater = idx in 0 until (homeItems.size - 1),
-                                            onMoveEarlier = { moveHomeItem(priceItem.itemKey, -1) },
-                                            onMoveLater = { moveHomeItem(priceItem.itemKey, 1) },
-                                            onRemove = { removeHomeItemWithUndo(priceItem.itemKey) }
-                                        )
-                                    }
-                                    if (isLastRow && rowItems.size == 1) {
-                                        AddItemTile(
-                                            modifier = Modifier.weight(1f).fillMaxHeight(),
-                                            onClick = { showManageDialog = true }
-                                        )
-                                    }
+                        if (homeViewMode == "list") {
+                            LazyColumn(
+                                modifier = Modifier.weight(1f).fillMaxWidth(),
+                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                items(gridList) { priceItem ->
+                                    HomeListRow(
+                                        priceItem = priceItem,
+                                        onRemove = { removeHomeItemWithUndo(priceItem.itemKey) }
+                                    )
                                 }
-                            }
-                            if (lastRowHasSpace.not()) {
                                 item {
+                                    AddItemTile(
+                                        modifier = Modifier.fillMaxWidth().height(56.dp),
+                                        onClick = { showManageDialog = true }
+                                    )
+                                }
+                                item { Spacer(Modifier.height(6.dp)) }
+                            }
+                        } else {
+                            LazyColumn(
+                                modifier = Modifier.weight(1f).fillMaxWidth(),
+                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                val rows = gridList.chunked(2)
+                                val lastRowHasSpace = rows.isEmpty() || rows.last().size < 2
+                                itemsIndexed(rows) { rowIndex, rowItems ->
+                                    val isLastRow = rowIndex == rows.lastIndex
                                     Row(
                                         modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
                                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        AddItemTile(
-                                            modifier = Modifier.weight(1f).fillMaxHeight(),
-                                            onClick = { showManageDialog = true }
-                                        )
-                                        Spacer(Modifier.weight(1f))
+                                        rowItems.forEach { priceItem ->
+                                            val idx = homeItems.indexOf(priceItem.itemKey)
+                                            HomeGridCard(
+                                                priceItem = priceItem,
+                                                modifier = Modifier.weight(1f).fillMaxHeight(),
+                                                canMoveEarlier = idx > 0,
+                                                canMoveLater = idx in 0 until (homeItems.size - 1),
+                                                onMoveEarlier = { moveHomeItem(priceItem.itemKey, -1) },
+                                                onMoveLater = { moveHomeItem(priceItem.itemKey, 1) },
+                                                onRemove = { removeHomeItemWithUndo(priceItem.itemKey) }
+                                            )
+                                        }
+                                        if (isLastRow && rowItems.size == 1) {
+                                            AddItemTile(
+                                                modifier = Modifier.weight(1f).fillMaxHeight(),
+                                                onClick = { showManageDialog = true }
+                                            )
+                                        }
                                     }
                                 }
+                                if (lastRowHasSpace.not()) {
+                                    item {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            AddItemTile(
+                                                modifier = Modifier.weight(1f).fillMaxHeight(),
+                                                onClick = { showManageDialog = true }
+                                            )
+                                            Spacer(Modifier.weight(1f))
+                                        }
+                                    }
+                                }
+                                item { Spacer(Modifier.height(6.dp)) }
                             }
-                            item { Spacer(Modifier.height(6.dp)) }
                         }
                     }
                 }
@@ -1358,43 +1370,13 @@ fun AppScreen() {
 
             Spacer(Modifier.height(10.dp))
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .clickable {
-                        val appIntent = android.content.Intent(
-                            android.content.Intent.ACTION_VIEW,
-                            android.net.Uri.parse("instagram://user?username=shahinsafaei")
-                        ).apply { setPackage("com.instagram.android") }
-                        try {
-                            context.startActivity(appIntent)
-                        } catch (e: Exception) {
-                            context.startActivity(
-                                android.content.Intent(
-                                    android.content.Intent.ACTION_VIEW,
-                                    android.net.Uri.parse("https://instagram.com/shahinsafaei")
-                                )
-                            )
-                        }
-                    }
-                    .padding(vertical = 8.dp),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    painter = painterResource(R.drawable.ic_instagram),
-                    contentDescription = "اینستاگرام",
-                    modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                )
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    "توسعه‌دهنده: شاهین صفایی",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                )
-            }
+            Text(
+                "نسخه ${ir.pricewidget.app.BuildConfig.VERSION_NAME}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
+            )
         }
     }
 
@@ -1671,7 +1653,8 @@ private fun AutoThemeOption(
                 else Modifier.border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f), RoundedCornerShape(14.dp))
             )
             .clickable { onClick() }
-            .padding(10.dp)
+            .padding(10.dp),
+        verticalArrangement = Arrangement.Center
     ) {
         Row(
             modifier = Modifier
