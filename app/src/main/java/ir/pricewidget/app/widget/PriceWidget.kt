@@ -115,7 +115,6 @@ class PriceWidget : GlanceAppWidget() {
         val selected = repo.getSelectedItemsOnce()
         val cached = repo.getCachedOnce()
         val followSystem = repo.isWidgetFollowSystemOnce()
-        val priceHidden = repo.isWidgetPriceHiddenOnce()
         val dark = if (followSystem) {
             val uiMode = context.resources.configuration.uiMode and
                 android.content.res.Configuration.UI_MODE_NIGHT_MASK
@@ -123,6 +122,8 @@ class PriceWidget : GlanceAppWidget() {
         } else {
             repo.isDarkWidgetOnce()
         }
+
+        val priceHidden = repo.isWidgetPriceHiddenOnce()
 
         provideContent {
             WidgetContent(cached, selected, if (dark) DarkPalette else LightPalette, priceHidden)
