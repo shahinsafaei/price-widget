@@ -26,6 +26,7 @@ class PrefsRepository(private val context: Context) {
         val NOTIF_ENABLED = androidx.datastore.preferences.core.booleanPreferencesKey("notif_enabled")
         val ONBOARDED = androidx.datastore.preferences.core.booleanPreferencesKey("onboarded")
         val HOME_ITEMS_ORDER = stringPreferencesKey("home_items_order")
+        val WIDGET_PRICE_HIDDEN = androidx.datastore.preferences.core.booleanPreferencesKey("widget_price_hidden")
     }
 
     // Home-screen watchlist, stored as an ORDERED list (joined by a separator
@@ -122,4 +123,12 @@ class PrefsRepository(private val context: Context) {
     suspend fun getSelectedItemsOnce(): Set<String> = selectedItemsFlow.first()
     suspend fun getCachedOnce(): GoldCurrencyResponse? = cachedResponseFlow.first()
     suspend fun getLastUpdatedOnce(): String? = lastUpdatedFlow.first()
+    val widgetPriceHiddenFlow: Flow<Boolean> = context.dataStore.data.map { it[Keys.WIDGET_PRICE_HIDDEN] ?: false }
+
+    suspend fun setWidgetPriceHidden(hidden: Boolean) {
+        context.dataStore.edit { it[Keys.WIDGET_PRICE_HIDDEN] = hidden }
+    }
+
+    suspend fun isWidgetPriceHiddenOnce(): Boolean = widgetPriceHiddenFlow.first()
+    
 }

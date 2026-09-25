@@ -135,35 +135,54 @@ fun SettingsScreen(
 
             Spacer(Modifier.height(24.dp))
             SettingsSectionTitle("درباره‌ی برنامه")
-
-            Text(
-                "توسعه‌دهنده: شاهین صفایی",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-            )
             Spacer(Modifier.height(8.dp))
             val context = androidx.compose.ui.platform.LocalContext.current
-            TextButton(onClick = {
-                try {
-                    val appIntent = android.content.Intent(
-                        android.content.Intent.ACTION_VIEW,
-                        android.net.Uri.parse("instagram://user?username=shahinsafaei")
-                    ).apply { setPackage("com.instagram.android") }
-                    context.startActivity(appIntent)
-                } catch (e: Exception) {
-                    try {
-                        context.startActivity(
-                            android.content.Intent(
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                    .clickable {
+                        try {
+                            val appIntent = android.content.Intent(
                                 android.content.Intent.ACTION_VIEW,
-                                android.net.Uri.parse("https://instagram.com/shahinsafaei")
-                            )
-                        )
-                    } catch (e2: Exception) {
-                        // مرورگر یا اینستاگرام روی گوشی نیست؛ بی‌سروصدا رد می‌شیم
+                                android.net.Uri.parse("instagram://user?username=shahinsafaei")
+                            ).apply { setPackage("com.instagram.android") }
+                            context.startActivity(appIntent)
+                        } catch (e: Exception) {
+                            try {
+                                context.startActivity(
+                                    android.content.Intent(
+                                        android.content.Intent.ACTION_VIEW,
+                                        android.net.Uri.parse("https://instagram.com/shahinsafaei")
+                                    )
+                                )
+                            } catch (e2: Exception) { }
+                        }
                     }
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    painter = androidx.compose.ui.res.painterResource(id = ir.pricewidget.app.R.drawable.ic_instagram),
+                    contentDescription = "اینستاگرام",
+                    tint = androidx.compose.ui.graphics.Color(0xFFE1306C),
+                    modifier = Modifier.size(22.dp)
+                )
+                Spacer(Modifier.width(10.dp))
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        "شاهین صفایی",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        "@shahinsafaei",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
                 }
-            }) {
-                Text("اینستاگرام توسعه‌دهنده")
             }
         }
     }

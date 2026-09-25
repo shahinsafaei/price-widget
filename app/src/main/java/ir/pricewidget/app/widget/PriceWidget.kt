@@ -115,6 +115,7 @@ class PriceWidget : GlanceAppWidget() {
         val selected = repo.getSelectedItemsOnce()
         val cached = repo.getCachedOnce()
         val followSystem = repo.isWidgetFollowSystemOnce()
+        val priceHidden = repo.isWidgetPriceHiddenOnce()
         val dark = if (followSystem) {
             val uiMode = context.resources.configuration.uiMode and
                 android.content.res.Configuration.UI_MODE_NIGHT_MASK
@@ -124,12 +125,12 @@ class PriceWidget : GlanceAppWidget() {
         }
 
         provideContent {
-            WidgetContent(cached, selected, if (dark) DarkPalette else LightPalette)
+            WidgetContent(cached, selected, if (dark) DarkPalette else LightPalette, priceHidden)
         }
     }
 
     @Composable
-    private fun WidgetContent(response: GoldCurrencyResponse?, selectedKeys: Set<String>, palette: Palette) {
+    private fun WidgetContent(response: GoldCurrencyResponse?, selectedKeys: Set<String>, palette: Palette, priceHidden: Boolean) {
         val items = response?.allItems()
             ?.map { it.second }
             ?.filter { it.itemKey in selectedKeys }
@@ -146,8 +147,8 @@ class PriceWidget : GlanceAppWidget() {
         ) {
             when {
                 items.isEmpty() -> EmptyState(palette)
-                items.size == 1 -> SingleItemLayout(items.first(), palette)
-                else -> GridLayout(items, palette)
+                items.size == 1 -> SingleItemLayout(items.first(), palette, priceHidden)
+                else -> GridLayout(items, palette, priceHidden)
             }
         }
     }
@@ -167,7 +168,7 @@ class PriceWidget : GlanceAppWidget() {
     }
 
     @Composable
-    private fun SingleItemLayout(item: PriceItem, palette: Palette) {
+    private fun SingleItemLayout(item: PriceItem, palette: Palette, priceHidden: Boolean) {
         Box(
             modifier = GlanceModifier
                 .fillMaxSize()
@@ -192,27 +193,35 @@ class PriceWidget : GlanceAppWidget() {
                 }
                 Spacer(modifier = GlanceModifier.defaultWeight())
                 ChangeText(item, fontSize = 13.sp)
-                Text(
-                    formatWidgetPrice(item),
-                    style = TextStyle(color = ColorProvider(palette.textPrimary), fontSize = 24.sp, fontWeight = FontWeight.Bold),
-                    maxLines = 1
-                )
-                if (!item.unit.isNullOrBlank()) {
+                if (priceHidden) {
                     Text(
-                        item.unit,
-                        style = TextStyle(color = ColorProvider(palette.textSecondary), fontSize = 11.sp),
+                        "••••••",
+                        style = TextStyle(color = ColorProvider(palette.textSecondary), fontSize = 24.sp, fontWeight = FontWeight.Bold),
                         maxLines = 1
                     )
+                } else {
+                    Text(
+                        formatWidgetPrice(item),
+                        style = TextStyle(color = ColorProvider(palette.textPrimary), fontSize = 24.sp, fontWeight = FontWeight.Bold),
+                        maxLines = 1
+                    )
+                    if (!item.unit.isNullOrBlank()) {
+                        Text(
+                            item.unit,
+                            style = TextStyle(color = ColorProvider(palette.textSecondary), fontSize = 11.sp),
+                            maxLines = 1
+                        )
+                    }
                 }
             }
         }
     }
 
     @Composable
-    private fun GridLayout(items: List<PriceItem>, palette: Palette) {
+    private fun GridLayout(items: List<PriceItem>, palette: Palette, priceHidden: Boolean) {
         Column(modifier = GlanceModifier.fillMaxSize()) {
             items.forEachIndexed { index, item ->
-                RowCard(item, palette, GlanceModifier.fillMaxWidth().defaultWeight())
+                RowCard(item, palette, priceHidden, GlanceModifier.fillMaxWidth().defaultWeight())
                 if (index != items.lastIndex) {
                     Spacer(modifier = GlanceModifier.height(8.dp))
                 }
@@ -221,7 +230,7 @@ class PriceWidget : GlanceAppWidget() {
     }
 
     @Composable
-    private fun RowCard(item: PriceItem, palette: Palette, modifier: GlanceModifier) {
+    private fun RowCard(item: PriceItem, palette: Palette, priceHidden: Boolean, modifier: GlanceModifier) {
         Row(
             modifier = modifier
                 .background(palette.subCardBg)
@@ -240,11 +249,19 @@ class PriceWidget : GlanceAppWidget() {
             Spacer(modifier = GlanceModifier.width(6.dp))
             Column(horizontalAlignment = Alignment.Horizontal.End) {
                 ChangeText(item, fontSize = 10.sp)
-                Text(
-                    formatWidgetPrice(item),
-                    style = TextStyle(color = ColorProvider(palette.textPrimary), fontSize = 15.sp, fontWeight = FontWeight.Bold),
-                    maxLines = 1
-                )
+                if (priceHidden) {
+                    Text(
+                        "••••",
+                        style = TextStyle(color = ColorProvider(palette.textSecondary), fontSize = 15.sp, fontWeight = FontWeight.Bold),
+                        maxLines = 1
+                    )
+                } else {
+                    Text(
+                        formatWidgetPrice(item),
+                        style = TextStyle(color = ColorProvider(palette.textPrimary), fontSize = 15.sp, fontWeight = FontWeight.Bold),
+                        maxLines = 1
+                    )
+                }
             }
         }
     }
