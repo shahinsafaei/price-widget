@@ -599,22 +599,22 @@ fun HomeListRow(
             .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            ir.pricewidget.app.data.IconMap.flag(priceItem.symbol ?: priceItem.itemKey),
-            style = MaterialTheme.typography.titleMedium
-        )
-        Spacer(Modifier.width(10.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(priceItem.displayName, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Medium, maxLines = 1)
-            if (!priceItem.unit.isNullOrBlank()) {
-                Text(priceItem.unit, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
+        Column(horizontalAlignment = Alignment.Start, modifier = Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.Bottom) {
+                RollingNumberText(
+                    text = priceItem.priceValue?.let { PriceFormat.format(it) } ?: priceItem.price ?: "--",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                )
+                if (!priceItem.unit.isNullOrBlank()) {
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        priceItem.unit,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                        modifier = Modifier.padding(bottom = 1.dp)
+                    )
+                }
             }
-        }
-        Column(horizontalAlignment = Alignment.End) {
-            RollingNumberText(
-                text = priceItem.priceValue?.let { PriceFormat.format(it) } ?: priceItem.price ?: "--",
-                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
-            )
             val pct = priceItem.changePercent
             if (pct != null) {
                 Text(
@@ -624,7 +624,21 @@ fun HomeListRow(
                 )
             }
         }
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(10.dp))
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.End
+        ) {
+            Column(horizontalAlignment = Alignment.End) {
+                Text(priceItem.displayName, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Medium, maxLines = 1)
+            }
+            Spacer(Modifier.width(8.dp))
+            Text(
+                ir.pricewidget.app.data.IconMap.flag(priceItem.symbol ?: priceItem.itemKey),
+                style = MaterialTheme.typography.titleMedium
+            )
+        }
+        Spacer(Modifier.width(4.dp))
         IconButton(onClick = onRemove, modifier = Modifier.size(28.dp)) {
             Icon(Icons.Filled.Close, contentDescription = "حذف", modifier = Modifier.size(16.dp))
         }
@@ -859,6 +873,7 @@ fun AppScreen() {
     var notifEnabled by remember { mutableStateOf(false) }
     var limitMessage by remember { mutableStateOf<String?>(null) }
     var showOnboarding by remember { mutableStateOf(false) }
+    var widgetPriceHidden by remember { mutableStateOf(false) }
     val marketOpen = remember { isMarketOpenNow() }
 
     suspend fun refresh(hapticOnChange: Boolean = false) {
@@ -925,6 +940,7 @@ fun AppScreen() {
         headerInterval = repo.getHeaderIntervalOnce()
         headerItemCount = repo.getHeaderItemCountOnce()
         homeViewMode = repo.getHomeViewModeOnce()
+        widgetPriceHidden = repo.isWidgetPriceHiddenOnce()
 
         // بگ فیکس: اول کش رو نشون بده (اگه بود)، بعد صبر کن برای شبکه —
         // به‌جای این‌که کاربر تا جواب شبکه اسپینر ببینه حتی وقتی دیتای قدیمی داریم
@@ -1128,8 +1144,7 @@ fun AppScreen() {
                         // user has one, else the first 3 by order) — the rest of the
                         // watchlist lives only in the grid below, so nothing is
                         // duplicated between header and grid.
-                        val widgetInHome = homeItems.filter { it in selected }
-                        val headerKeys = if (widgetInHome.isNotEmpty()) widgetInHome else homeItems.take(headerItemCount)
+                        val headerKeys = homeItems.take(headerItemCount)
                         var headerList = homeList.filter { it.itemKey in headerKeys }
                         if (headerList.isEmpty()) headerList = homeList.take(headerItemCount)
                         val gridList = homeList.filter { it !in headerList }
@@ -1360,7 +1375,36 @@ fun AppScreen() {
             }
 
             Spacer(Modifier.height(10.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(MaterialTheme.colorScheme.surface)
+                    .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), RoundedCornerShape(14.dp))
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "مخفی کردن قیمت در ویجت",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Medium
+                )
+                Switch(
+                    checked = widgetPriceHidden,
+                    onCheckedChange = { hidden ->
+                        widgetPriceHidden = hidden
+                        scope.launch {
+                            repo.setWidgetPriceHidden(hidden)
+                            WorkScheduler.refreshWidgetNow(context)
+                        }
+                    },
+                    modifier = Modifier.scale(0.8f)
+                )
+            }
+            Spacer(Modifier.height(8.dp))
 
+            
             Text(
                 "نسخه ${ir.pricewidget.app.BuildConfig.VERSION_NAME}",
                 style = MaterialTheme.typography.labelSmall,
