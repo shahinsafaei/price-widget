@@ -692,7 +692,7 @@ fun ManageItemsDialog(
                     }
                 }
 
-                if (categories.size > 1) {
+                OutlinedTextField(
                     value = query,
                     onValueChange = { query = it },
                     placeholder = { Text("جستجو…", style = MaterialTheme.typography.bodySmall) },
