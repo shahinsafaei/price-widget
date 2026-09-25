@@ -392,6 +392,8 @@ fun HomeFeaturedPager(
 ) {
     if (items.isEmpty()) return
     val pagerState = rememberPagerState(pageCount = { items.size })
+    val itemCount = items.size
+
     LaunchedEffect(itemCount) {
         if (itemCount > 0 && pagerState.currentPage >= itemCount) {
             pagerState.scrollToPage(itemCount - 1)
