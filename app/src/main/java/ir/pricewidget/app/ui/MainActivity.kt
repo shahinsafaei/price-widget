@@ -706,15 +706,6 @@ fun ManageItemsDialog(
                         .height(52.dp)
                 )
 
-                limitMessage?.let {
-                    Text(
-                        it,
-                        color = MaterialTheme.colorScheme.tertiary,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp)
-                    )
-                }
-
                 if (categories.size > 1) {
                     LazyRowCategoryChips(
                         categories = categories,
@@ -1407,7 +1398,7 @@ fun AppScreen() {
 
     if (showManageDialog) {
         ManageItemsDialog(
-            allItems = allItems,
+            allItems = response?.allItems() ?: emptyList(),
             homeItems = homeItems,
             onToggleHome = { key, checked ->
                 homeItems = if (checked) homeItems + key else homeItems - key
