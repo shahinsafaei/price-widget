@@ -1191,7 +1191,7 @@ fun AppScreen() {
                                             val idx = homeItems.indexOf(priceItem.itemKey)
                                             HomeGridCard(
                                                 priceItem = priceItem,
-                                                modifier = Modifier.weight(1f).fillMaxHeight(),
+                                                modifier = Modifier.weight(1f).aspectRatio(1f),
                                                 canMoveEarlier = idx > 0,
                                                 canMoveLater = idx in 0 until (homeItems.size - 1),
                                                 onMoveEarlier = { moveHomeItem(priceItem.itemKey, -1) },
@@ -1201,7 +1201,7 @@ fun AppScreen() {
                                         }
                                         if (isLastRow && rowItems.size == 1) {
                                             AddItemTile(
-                                                modifier = Modifier.weight(1f).fillMaxHeight(),
+                                                modifier = Modifier.weight(1f).aspectRatio(1f),
                                                 onClick = { showManageDialog = true }
                                             )
                                         }
@@ -1214,7 +1214,7 @@ fun AppScreen() {
                                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                                         ) {
                                             AddItemTile(
-                                                modifier = Modifier.weight(1f).fillMaxHeight(),
+                                                modifier = Modifier.weight(1f).aspectRatio(1f),
                                                 onClick = { showManageDialog = true }
                                             )
                                             Spacer(Modifier.weight(1f))
@@ -1441,43 +1441,46 @@ fun AppScreen() {
                 isDark = dialogDark
                 widgetFollowSystem = dialogFollowSystem
                 selected = dialogSelected
-                WorkScheduler.saveWidgetTheme(context, dialogDark, dialogFollowSystem)
-                WorkScheduler.saveWidgetItems(context, dialogSelected)
-                scope.launch {
-                    val alreadyPinned = GlanceAppWidgetManager(context)
-                        .getGlanceIds(PriceWidget::class.java)
-                        .isNotEmpty()
+                WorkScheduler.saveWidgetSettings(context, dialogDark, dialogFollowSystem, dialogSelected)
 
-                    if (alreadyPinned) {
-                        android.widget.Toast.makeText(
-                            context,
-                            "تنظیمات ویجت ذخیره و اعمال شد",
-                            android.widget.Toast.LENGTH_SHORT
-                        ).show()
-                    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        val appWidgetManager = context.getSystemService(AppWidgetManager::class.java)
-                        val provider = ComponentName(context, PriceWidgetReceiver::class.java)
-                        if (appWidgetManager.isRequestPinAppWidgetSupported) {
-                            android.widget.Toast.makeText(
-                                context,
-                                "درخواست افزودن ویجت ارسال شد — تایید کن",
-                                android.widget.Toast.LENGTH_SHORT
-                            ).show()
+                // این چک باید sync باشه (نه suspend)، وگرنه requestPinAppWidget
+                // دیگه «واکنش مستقیم به کلیک کاربر» حساب نمی‌شه و خیلی از گوشی‌ها
+                // (Xiaomi/MIUI, Samsung) بی‌سروصدا نادیده‌ش می‌گیرن.
+                val provider = ComponentName(context, PriceWidgetReceiver::class.java)
+                val appWidgetManager = context.getSystemService(AppWidgetManager::class.java)
+                val alreadyPinned = appWidgetManager.getAppWidgetIds(provider).isNotEmpty()
+
+                if (alreadyPinned) {
+                    android.widget.Toast.makeText(
+                        context,
+                        "تنظیمات ویجت ذخیره و اعمال شد",
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    if (appWidgetManager.isRequestPinAppWidgetSupported) {
+                        try {
                             appWidgetManager.requestPinAppWidget(provider, null, null)
-                        } else {
+                        } catch (e: Exception) {
+                            android.util.Log.e("WidgetPin", "requestPinAppWidget failed", e)
                             android.widget.Toast.makeText(
                                 context,
-                                "این گوشی افزودن خودکار ویجت رو پشتیبانی نمی‌کنه؛ دستی از صفحه اصلی اضافه کن",
+                                "افزودن خودکار ممکن نشد؛ ویجت رو دستی از صفحه اصلی اضافه کن",
                                 android.widget.Toast.LENGTH_LONG
                             ).show()
                         }
                     } else {
                         android.widget.Toast.makeText(
                             context,
-                            "ویجت رو از صفحه اصلی گوشی دستی اضافه کن",
+                            "این گوشی افزودن خودکار ویجت رو پشتیبانی نمی‌کنه؛ دستی از صفحه اصلی اضافه کن",
                             android.widget.Toast.LENGTH_LONG
                         ).show()
                     }
+                } else {
+                    android.widget.Toast.makeText(
+                        context,
+                        "ویجت رو از صفحه اصلی گوشی دستی اضافه کن",
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
                 }
             }
         )

@@ -47,27 +47,33 @@ object WorkScheduler {
         )
     }
 
-    /** ذخیره‌ی تضمینی تم ویجت (روشن/تیره + پیرو سیستم)، مستقل از عمر صفحه. */
-    fun saveWidgetTheme(context: Context, dark: Boolean, followSystem: Boolean) {
+    /**
+     * ذخیره‌ی تضمینی تنظیمات ویجت (تم + آیتم‌های انتخاب‌شده) تو یه Worker واحد.
+     * قبلاً این دو تا با enqueue جدا و هم‌زمان اجرا می‌شدن که باعث یه race
+     * می‌شد: هرکدوم جداگونه ویجت رو رندر می‌کرد و ممکن بود اون یکی هنوز
+     * نوشته نشده رو با مقدار قدیمی بخونه (مثلاً تم عوض نشه تا یه تغییر
+     * دیگه دوباره trigger بشه). با یکی‌کردنشون، ذخیره + رندر همیشه atomic
+     * و با آخرین دیتای هر دو انجام می‌شه.
+     */
+    fun saveWidgetSettings(
+        context: Context,
+        dark: Boolean,
+        followSystem: Boolean,
+        items: Set<String>
+    ) {
         val data = Data.Builder()
             .putBoolean(WidgetRefreshWorker.KEY_DARK, dark)
             .putBoolean(WidgetRefreshWorker.KEY_FOLLOW_SYSTEM, followSystem)
-            .build()
-        val request = androidx.work.OneTimeWorkRequestBuilder<WidgetRefreshWorker>()
-            .setInputData(data)
-            .build()
-        WorkManager.getInstance(context).enqueue(request)
-    }
-
-    /** ذخیره‌ی تضمینی آیتم‌های انتخاب‌شده برای ویجت، مستقل از عمر صفحه. */
-    fun saveWidgetItems(context: Context, items: Set<String>) {
-        val data = Data.Builder()
             .putStringArray(WidgetRefreshWorker.KEY_SELECTED_ITEMS, items.toTypedArray())
             .build()
         val request = androidx.work.OneTimeWorkRequestBuilder<WidgetRefreshWorker>()
             .setInputData(data)
             .build()
-        WorkManager.getInstance(context).enqueue(request)
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            "widget_settings_save",
+            androidx.work.ExistingWorkPolicy.REPLACE,
+            request
+        )
     }
 
     /** ذخیره‌ی تضمینی آیتم‌های صفحه‌ی اصلی، مستقل از عمر صفحه. */
