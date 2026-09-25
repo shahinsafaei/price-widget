@@ -84,10 +84,10 @@ fun SettingsScreen(
             }
 
             Spacer(Modifier.height(24.dp))
-            SettingsSectionTitle("چرخش خودکار هدر")
+            SettingsSectionTitle("کارت‌های بالای صفحه")
 
             Text(
-                "هر چند ثانیه، کارتِ بالای صفحه به آیتم بعدی بره",
+                "هر چند ثانیه، کارت بالای صفحه عوض بشه",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
             )
@@ -106,7 +106,7 @@ fun SettingsScreen(
 
             Spacer(Modifier.height(16.dp))
             Text(
-                "چند تا آیتم توی هدر بچرخه",
+                "تعداد کارت‌هایی که بالای صفحه نمایش داده میشن",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
             )
@@ -134,8 +134,6 @@ fun SettingsScreen(
             }
 
             Spacer(Modifier.height(24.dp))
-            SettingsSectionTitle("درباره‌ی برنامه")
-            Spacer(Modifier.height(8.dp))
             val context = androidx.compose.ui.platform.LocalContext.current
             Row(
                 modifier = Modifier
@@ -160,7 +158,7 @@ fun SettingsScreen(
                             } catch (e2: Exception) { }
                         }
                     }
-                    .padding(16.dp),
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center
             ) {
@@ -168,21 +166,14 @@ fun SettingsScreen(
                     painter = androidx.compose.ui.res.painterResource(id = ir.pricewidget.app.R.drawable.ic_instagram),
                     contentDescription = "اینستاگرام",
                     tint = androidx.compose.ui.graphics.Color(0xFFE1306C),
-                    modifier = Modifier.size(22.dp)
+                    modifier = Modifier.size(18.dp)
                 )
-                Spacer(Modifier.width(10.dp))
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        "شاهین صفایی",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        "@shahinsafaei",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                    )
-                }
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "توسعه‌دهنده: شاهین صفایی",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
             }
         }
     }

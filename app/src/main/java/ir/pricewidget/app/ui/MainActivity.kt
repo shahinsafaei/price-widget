@@ -1374,36 +1374,6 @@ fun AppScreen() {
                 }
             }
 
-            Spacer(Modifier.height(10.dp))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(MaterialTheme.colorScheme.surface)
-                    .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), RoundedCornerShape(14.dp))
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    "مخفی کردن قیمت در ویجت",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Medium
-                )
-                Switch(
-                    checked = widgetPriceHidden,
-                    onCheckedChange = { hidden ->
-                        widgetPriceHidden = hidden
-                        scope.launch {
-                            repo.setWidgetPriceHidden(hidden)
-                            WorkScheduler.refreshWidgetNow(context)
-                        }
-                    },
-                    modifier = Modifier.scale(0.8f)
-                )
-            }
-            Spacer(Modifier.height(8.dp))
-
             
             Text(
                 "نسخه ${ir.pricewidget.app.BuildConfig.VERSION_NAME}",
@@ -1456,6 +1426,7 @@ fun AppScreen() {
         var dialogDark by remember { mutableStateOf(isDark) }
         var dialogFollowSystem by remember { mutableStateOf(widgetFollowSystem) }
         var dialogSelected by remember { mutableStateOf(selected) }
+        var dialogPriceHidden by remember { mutableStateOf(widgetPriceHidden) }
         WidgetConfigDialog(
             alreadyPinned = widgetAlreadyPinned,
             allItems = response?.allItems() ?: emptyList(),
@@ -1467,14 +1438,18 @@ fun AppScreen() {
             followSystem = dialogFollowSystem,
             onThemeChange = { dark -> dialogDark = dark },
             onFollowSystemChange = { follow -> dialogFollowSystem = follow },
+            priceHidden = dialogPriceHidden,
+            onPriceHiddenChange = { hidden -> dialogPriceHidden = hidden },
             onDismiss = { showWidgetDialog = false },
             onConfirm = {
                 showWidgetDialog = false
                 isDark = dialogDark
                 widgetFollowSystem = dialogFollowSystem
                 selected = dialogSelected
+                widgetPriceHidden = dialogPriceHidden
                 WorkScheduler.saveWidgetTheme(context, dialogDark, dialogFollowSystem)
                 WorkScheduler.saveWidgetItems(context, dialogSelected)
+                WorkScheduler.saveWidgetPriceHidden(context, dialogPriceHidden)
                 scope.launch {
                     val alreadyPinned = GlanceAppWidgetManager(context)
                         .getGlanceIds(PriceWidget::class.java)
@@ -1526,6 +1501,8 @@ fun WidgetConfigDialog(
     followSystem: Boolean,
     onThemeChange: (Boolean) -> Unit,
     onFollowSystemChange: (Boolean) -> Unit,
+    priceHidden: Boolean,
+    onPriceHiddenChange: (Boolean) -> Unit,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit
 ) {
@@ -1575,6 +1552,28 @@ fun WidgetConfigDialog(
                             selected = followSystem,
                             modifier = Modifier.weight(1f).fillMaxHeight(),
                             onClick = { onFollowSystemChange(true) }
+                        )
+                    }
+
+                    Spacer(Modifier.height(16.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            "مخفی کردن قیمت در ویجت",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Switch(
+                            checked = priceHidden,
+                            onCheckedChange = onPriceHiddenChange,
+                            modifier = Modifier.scale(0.8f)
                         )
                     }
 

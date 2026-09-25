@@ -70,6 +70,17 @@ object WorkScheduler {
         WorkManager.getInstance(context).enqueue(request)
     }
 
+    /** ذخیره‌ی تضمینی مخفی/نمایش قیمت در ویجت، مستقل از عمر صفحه. */
+    fun saveWidgetPriceHidden(context: Context, hidden: Boolean) {
+        val data = Data.Builder()
+            .putBoolean(WidgetRefreshWorker.KEY_PRICE_HIDDEN, hidden)
+            .build()
+        val request = androidx.work.OneTimeWorkRequestBuilder<WidgetRefreshWorker>()
+            .setInputData(data)
+            .build()
+        WorkManager.getInstance(context).enqueue(request)
+    }
+
     /** ذخیره‌ی تضمینی آیتم‌های صفحه‌ی اصلی، مستقل از عمر صفحه. */
     fun saveHomeItems(context: Context, items: List<String>) {
         val data = Data.Builder()

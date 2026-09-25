@@ -27,6 +27,7 @@ class WidgetRefreshWorker(
         const val KEY_FOLLOW_SYSTEM = "key_follow_system"
         const val KEY_SELECTED_ITEMS = "key_selected_items"
         const val KEY_HOME_ITEMS = "key_home_items"
+        const val KEY_PRICE_HIDDEN = "key_price_hidden"
     }
 
     override suspend fun doWork(): Result {
@@ -44,6 +45,9 @@ class WidgetRefreshWorker(
             }
             inputData.getStringArray(KEY_HOME_ITEMS)?.let { items ->
                 repo.setHomeItems(items.toList())
+            }
+            if (inputData.keyValueMap.containsKey(KEY_PRICE_HIDDEN)) {
+                repo.setWidgetPriceHidden(inputData.getBoolean(KEY_PRICE_HIDDEN, false))
             }
 
             PriceWidget.forceUpdateAll(applicationContext)
