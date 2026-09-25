@@ -1169,6 +1169,10 @@ fun AppScreen() {
                         val headerList = (selectedHeaderItems + remainingItems)
                             .take(headerItemCount)
 
+                        val gridList = homeList.filter { item ->
+                            headerList.none { headerItem -> headerItem.itemKey == item.itemKey }
+                        }
+
                         DailySummaryLine(homeList)
                         HomeFeaturedPager(
                             items = headerList,
