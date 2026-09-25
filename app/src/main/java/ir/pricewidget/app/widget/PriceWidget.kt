@@ -89,21 +89,28 @@ class PriceWidget : GlanceAppWidget() {
 
     companion object {
         private const val TAG = "PriceWidget"
-
         suspend fun forceUpdateAll(context: Context) {
-            val widget = PriceWidget()
-            val ids = try {
-                GlanceAppWidgetManager(context).getGlanceIds(PriceWidget::class.java)
-            } catch (e: Exception) {
-                android.util.Log.e(TAG, "Failed to fetch GlanceIds for update", e)
-                emptyList()
-            }
-            ids.forEach { id ->
-                try {
-                    widget.update(context, id)
-                } catch (e: Exception) {
-                    android.util.Log.e(TAG, "Failed to update widget instance $id", e)
+            try {
+                val manager = GlanceAppWidgetManager(context)
+                val ids = manager.getGlanceIds(PriceWidget::class.java)
+
+                ids.forEach { id ->
+                    try {
+                        PriceWidget().update(context, id)
+                    } catch (e: Exception) {
+                        android.util.Log.e(
+                            TAG,
+                            "Failed to update widget instance $id",
+                            e
+                        )
+                    }
                 }
+            } catch (e: Exception) {
+                android.util.Log.e(
+                    TAG,
+                    "Failed to update all widget instances",
+                    e
+                )
             }
         }
     }

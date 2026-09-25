@@ -11,10 +11,14 @@ import java.util.Locale
  */
 object PriceFormat {
     fun format(value: Double): String {
-        return if (kotlin.math.abs(value) >= 1.0) {
-            "%,.0f".format(Locale.US, value)
-        } else {
-            "%,.4f".format(Locale.US, value)
+        val abs = kotlin.math.abs(value)
+
+        return when {
+            abs >= 1_000_000 -> "%,.0f".format(Locale.US, value)
+            abs >= 1.0 -> "%,.2f".format(Locale.US, value)
+            abs >= 0.01 -> "%,.4f".format(Locale.US, value)
+            abs >= 0.0001 -> "%,.6f".format(Locale.US, value)
+            else -> "%,.8f".format(Locale.US, value)
         }
     }
 }

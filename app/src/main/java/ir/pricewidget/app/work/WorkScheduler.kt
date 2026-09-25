@@ -64,11 +64,16 @@ object WorkScheduler {
         val data = Data.Builder()
             .putBoolean(WidgetRefreshWorker.KEY_DARK, dark)
             .putBoolean(WidgetRefreshWorker.KEY_FOLLOW_SYSTEM, followSystem)
-            .putStringArray(WidgetRefreshWorker.KEY_SELECTED_ITEMS, items.toTypedArray())
+            .putStringArray(
+                WidgetRefreshWorker.KEY_SELECTED_ITEMS,
+                items.toTypedArray()
+            )
             .build()
+
         val request = androidx.work.OneTimeWorkRequestBuilder<WidgetRefreshWorker>()
             .setInputData(data)
             .build()
+
         WorkManager.getInstance(context).enqueueUniqueWork(
             "widget_settings_save",
             androidx.work.ExistingWorkPolicy.REPLACE,
@@ -81,9 +86,15 @@ object WorkScheduler {
         val data = Data.Builder()
             .putStringArray(WidgetRefreshWorker.KEY_HOME_ITEMS, items.toTypedArray())
             .build()
+
         val request = androidx.work.OneTimeWorkRequestBuilder<WidgetRefreshWorker>()
             .setInputData(data)
             .build()
-        WorkManager.getInstance(context).enqueue(request)
+
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            "widget_home_items_save",
+            androidx.work.ExistingWorkPolicy.REPLACE,
+            request
+        )
     }
 }

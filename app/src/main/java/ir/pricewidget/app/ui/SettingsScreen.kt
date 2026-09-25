@@ -45,19 +45,6 @@ fun SettingsScreen(
                 }
             )
         },
-        bottomBar = {
-            Surface(shadowElevation = 8.dp) {
-                Button(
-                    onClick = { onSave(draftInterval, draftCount, draftViewMode) },
-                    enabled = dirty,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp)
-                ) {
-                    Text("ذخیره تغییرات")
-                }
-            }
-        }
     ) { padding ->
         Column(
             modifier = Modifier
@@ -111,29 +98,65 @@ fun SettingsScreen(
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
             )
             Spacer(Modifier.height(8.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(
-                    onClick = { if (draftCount > 1) draftCount-- },
-                    enabled = draftCount > 1
-                ) {
-                    Icon(Icons.Filled.Remove, contentDescription = "کم کردن")
-                }
-                Text(
-                    "$draftCount",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.width(32.dp)
-                )
-                IconButton(
-                    onClick = { if (draftCount < 5) draftCount++ },
-                    enabled = draftCount < 5
-                ) {
-                    Icon(Icons.Filled.Add, contentDescription = "زیاد کردن")
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                (1..5).forEach { count ->
+                    val selected = draftCount == count
+
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(42.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(
+                                if (selected) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                                }
+                            )
+                            .border(
+                                width = if (selected) 2.dp else 1.dp,
+                                color = if (selected) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f)
+                                },
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                            .clickable { draftCount = count },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            "$count",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                            color = if (selected) {
+                                MaterialTheme.colorScheme.onPrimary
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            }
+                        )
+                    }
                 }
             }
 
             Spacer(Modifier.height(24.dp))
+            if (dirty) {
+                Button(
+                    onClick = { onSave(draftInterval, draftCount, draftViewMode) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                ) {
+                    Text("ذخیره تغییرات")
+                }
+
+                Spacer(Modifier.height(12.dp))
+            }
             val context = androidx.compose.ui.platform.LocalContext.current
             Row(
                 modifier = Modifier
@@ -165,7 +188,7 @@ fun SettingsScreen(
                 Icon(
                     painter = androidx.compose.ui.res.painterResource(id = ir.pricewidget.app.R.drawable.ic_instagram),
                     contentDescription = "اینستاگرام",
-                    tint = androidx.compose.ui.graphics.Color(0xFFE1306C),
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(Modifier.width(8.dp))

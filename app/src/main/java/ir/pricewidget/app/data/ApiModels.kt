@@ -24,7 +24,7 @@ data class PriceItem(
 ) {
     /** Unique key used to identify this item across app + widget settings */
     val itemKey: String
-        get() = (nameEn ?: symbol ?: name ?: "unknown").trim()
+        get() = (symbol ?: nameEn ?: name ?: "unknown").trim()
 
     val displayName: String
         get() = name ?: nameEn ?: symbol ?: "—"

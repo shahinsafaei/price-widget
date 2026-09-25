@@ -28,6 +28,25 @@ class UpdateWorker(
         return try {
             val repo = PrefsRepository(applicationContext)
             val response = ApiService.create().getGoldCurrency()
+
+            val availableKeys = response.allItems()
+                .map { it.second.itemKey }
+                .toSet()
+
+            val currentSelected = repo.getSelectedItems()
+            val validSelected = currentSelected.intersect(availableKeys)
+
+            if (validSelected != currentSelected) {
+                repo.setSelectedItems(validSelected)
+            }
+
+            val currentHomeItems = repo.getHomeItems()
+            val validHomeItems = currentHomeItems.filter { it in availableKeys }
+
+            if (validHomeItems != currentHomeItems) {
+                repo.setHomeItems(validHomeItems)
+            }
+
             val now = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
             repo.saveCache(response, now)
             PriceWidget.forceUpdateAll(applicationContext)

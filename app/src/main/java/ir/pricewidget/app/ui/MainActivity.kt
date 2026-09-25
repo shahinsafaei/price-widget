@@ -392,15 +392,22 @@ fun HomeFeaturedPager(
 ) {
     if (items.isEmpty()) return
     val pagerState = rememberPagerState(pageCount = { items.size })
-    val itemCount = items.size
-
+    LaunchedEffect(itemCount) {
+        if (itemCount > 0 && pagerState.currentPage >= itemCount) {
+            pagerState.scrollToPage(itemCount - 1)
+        }
+    }
     // چرخش خودکار — بازه‌ش الان قابل‌تنظیمه (از صفحه‌ی تنظیمات)، دیگه هاردکد نیست.
     LaunchedEffect(itemCount, intervalSeconds) {
         if (itemCount <= 1) return@LaunchedEffect
+
         while (true) {
             kotlinx.coroutines.delay(intervalSeconds * 1000L)
-            val next = (pagerState.currentPage + 1) % itemCount
-            pagerState.animateScrollToPage(next)
+
+            if (!pagerState.isScrollInProgress) {
+                val next = (pagerState.currentPage + 1) % itemCount
+                pagerState.animateScrollToPage(next)
+            }
         }
     }
 
@@ -873,7 +880,14 @@ fun AppScreen() {
     var notifEnabled by remember { mutableStateOf(false) }
     var limitMessage by remember { mutableStateOf<String?>(null) }
     var showOnboarding by remember { mutableStateOf(false) }
-    val marketOpen = remember { isMarketOpenNow() }
+    var marketOpen by remember { mutableStateOf(isMarketOpenNow()) }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(60_000L)
+            marketOpen = isMarketOpenNow()
+        }
+    }
 
     suspend fun refresh(hapticOnChange: Boolean = false) {
         try {
@@ -1143,9 +1157,15 @@ fun AppScreen() {
                         // watchlist lives only in the grid below, so nothing is
                         // duplicated between header and grid.
                         val headerKeys = homeItems.take(headerItemCount)
-                        var headerList = homeList.filter { it.itemKey in headerKeys }
-                        if (headerList.isEmpty()) headerList = homeList.take(headerItemCount)
-                        val gridList = homeList.filter { it !in headerList }
+
+                        val selectedHeaderItems = homeList
+                            .filter { it.itemKey in headerKeys }
+
+                        val remainingItems = homeList
+                            .filter { it !in selectedHeaderItems }
+
+                        val headerList = (selectedHeaderItems + remainingItems)
+                            .take(headerItemCount)
 
                         DailySummaryLine(homeList)
                         HomeFeaturedPager(
@@ -1441,7 +1461,12 @@ fun AppScreen() {
                 isDark = dialogDark
                 widgetFollowSystem = dialogFollowSystem
                 selected = dialogSelected
-                WorkScheduler.saveWidgetSettings(context, dialogDark, dialogFollowSystem, dialogSelected)
+                scope.launch {
+                repo.setWidgetDark(dialogDark)
+                repo.setWidgetFollowSystem(dialogFollowSystem)
+                repo.setSelectedItems(dialogSelected)
+                ir.pricewidget.app.widget.PriceWidget.forceUpdateAll(context)
+            }
 
                 // این چک باید sync باشه (نه suspend)، وگرنه requestPinAppWidget
                 // دیگه «واکنش مستقیم به کلیک کاربر» حساب نمی‌شه و خیلی از گوشی‌ها
