@@ -144,7 +144,93 @@ COINGECKO_IDS = {
 }
 
 
+TOP_CRYPTO = 100
+# Persian display names for well-known coins (others keep their English name).
+CRYPTO_FA = {
+    "BTC": "بیت‌کوین", "ETH": "اتریوم", "BNB": "بی‌ان‌بی", "XRP": "ریپل", "SOL": "سولانا", "TRX": "ترون",
+    "DOGE": "دوج‌کوین", "ADA": "کاردانو", "LINK": "چین‌لینک", "XLM": "استلار", "AVAX": "آوالانچ",
+    "SHIB": "شیبا اینو", "LTC": "لایت‌کوین", "DOT": "پولکادات", "UNI": "یونی‌سواپ", "ATOM": "کازماس",
+    "FIL": "فایل‌کوین", "BCH": "بیت‌کوین کش", "XMR": "مونرو", "ZEC": "زی‌کش", "NEAR": "نییر",
+    "SUI": "سویی", "HBAR": "هدرا", "TON": "تون‌کوین", "GRAM": "تون‌کوین", "PEPE": "پپه", "ETC": "اتریوم کلاسیک",
+    "ARB": "آربیتروم", "APT": "آپتوس", "ALGO": "الگوراند", "AAVE": "آوه", "ICP": "اینترنت کامپیوتر",
+    "KAS": "کسپا", "RENDER": "رندر", "VET": "وی‌چین", "INJ": "اینجکتیو", "CAKE": "پنکیک‌سواپ",
+    "POL": "پالیگان", "WLD": "ورلدکوین", "TAO": "بیتنسور", "PI": "پای نتورک", "HYPE": "هایپرلیکوئید",
+    "XAUT": "تتر گلد (طلا)", "PAXG": "پکس گلد (طلا)", "USDT": "تتر", "USDC": "یواس‌دی کوین",
+    "CRO": "کرونوس", "OKB": "اوکی‌بی", "LEO": "لئو", "QNT": "کوانت", "ONDO": "اوندو", "ENA": "اتنا",
+}
+# Stablecoins and tokenized funds/credit add noise to a price list — USDT/USDC stay.
+CRYPTO_SKIP_IDS = {
+    "usds", "ethena-usde", "dai", "usd1-wlfi", "global-dollar", "paypal-usd", "ripple-usd", "hashnote-usyc",
+    "ondo-us-dollar-yield", "blackrock-usd-institutional-digital-liquidity-fund", "falcon-finance",
+    "spiko-amundi-overnight-swap-fund-eur", "usdd", "united-stables", "bfusd", "usdgo", "open-usd",
+    "superstate-short-duration-us-government-securities-fund-ustb", "stable-2", "gho", "figure-heloc",
+    "blockchain-capital", "first-digital-usd", "true-usd", "frax", "susds", "syrupusdc",
+}
+
+
+def _is_stable(c):
+    """Generic stablecoin filter for coins not in the skip list."""
+    sym = (c.get("symbol") or "").upper()
+    p = c.get("current_price") or 0
+    return sym not in ("USDT", "USDC") and ("USD" in sym or "EUR" in sym) and 0.9 <= p <= 1.1
+
+
+def refresh_crypto_top(gold, now):
+    """Replaces the crypto list with the top coins by market cap (one free CoinGecko
+    request): price in USD + 24h change. Persian names where known."""
+    url = ("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc"
+           "&per_page=150&page=1&price_change_percentage=24h")
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=30) as r:
+            coins = json.loads(r.read().decode("utf-8"))
+    except Exception as e:
+        print(f"  crypto top list (CoinGecko): {type(e).__name__}")
+        return False
+    if not isinstance(coins, list) or not coins:
+        return False
+    jy, jm, jd = g2j(now.year, now.month, now.day)
+    out, seen = [], set()
+    for c in coins:
+        sym = (c.get("symbol") or "").upper()
+        p = c.get("current_price")
+        if not sym or p is None or c.get("id") in CRYPTO_SKIP_IDS or _is_stable(c) or sym in seen:
+            continue
+        seen.add(sym)
+        pct = c.get("price_change_percentage_24h")
+        out.append({
+            "symbol": sym,
+            "name": CRYPTO_FA.get(sym) or c.get("name") or sym,
+            "name_en": c.get("name"),
+            "price": ("%.10f" % p).rstrip("0").rstrip("."),
+            "change_percent": round(pct, 2) if pct is not None else None,
+            "change_value": c.get("price_change_24h"),
+            "unit": "دلار",
+            "date": "%d/%02d/%02d" % (jy, jm, jd),
+            "time": now.strftime("%H:%M"),
+            "time_unix": int(now.timestamp()),
+            "x_mcap": c.get("market_cap"),
+            "x_volume": c.get("total_volume"),
+            "x_high": c.get("high_24h"),
+            "x_low": c.get("low_24h"),
+        })
+        if len(out) >= TOP_CRYPTO:
+            break
+    if len(out) < 20:
+        return False
+    gold["cryptocurrency"] = out
+    print(f"  crypto: top {len(out)} coins from CoinGecko")
+    return True
+
+
 def refresh_crypto(gold, now):
+    """Top-100 list first; if that request fails, at least refresh the coins we already have."""
+    if refresh_crypto_top(gold, now):
+        return True
+    return refresh_crypto_quotes(gold, now)
+
+
+def refresh_crypto_quotes(gold, now):
     """Overwrites crypto prices in the gold/currency payload with fresh CoinGecko
     quotes (USD + 24h change). Returns True if anything was updated."""
     items = {x["symbol"]: x for x in gold.get("cryptocurrency", []) or [] if isinstance(x, dict) and x.get("symbol") in COINGECKO_IDS}
