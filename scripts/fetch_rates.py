@@ -286,7 +286,27 @@ def stock_rows(raw):
 
 
 def codal_rows(raw):
-    rows = raw if isinstance(raw, list) else (raw.get("data") or raw.get("items") or []) if isinstance(raw, dict) else []
+    """Announcement.php may return a bare list or an object with paging fields
+    (count_announcement, count_page …) and the list under some key — find the
+    first list of dicts that have a "title", wherever it is."""
+    def find(e, depth=0):
+        if depth > 3:
+            return None
+        if isinstance(e, list):
+            if any(isinstance(x, dict) and x.get("title") for x in e):
+                return e
+            for x in e:
+                r = find(x, depth + 1)
+                if r:
+                    return r
+        elif isinstance(e, dict):
+            for v in e.values():
+                r = find(v, depth + 1)
+                if r:
+                    return r
+        return None
+
+    rows = find(raw) or []
     out = []
     for o in rows:
         if isinstance(o, dict) and o.get("title"):
@@ -432,7 +452,15 @@ def main():
 
     # 3) codal — hourly, latest announcements for all symbols in one call
     if hourly or manual or not os.path.exists(f"{dd}/codal.json"):
-        rows = codal_rows(api.get("Codal/Announcement.php", {"page": 1}))
+        # Uses the reserved budget: ~12 calls/day, and it must not starve when backfill runs.
+        raw_codal = api.get("Codal/Announcement.php", {"page": 1}, critical=True)
+        rows = codal_rows(raw_codal)
+        # Record the response shape when nothing parses, so a format change is visible.
+        state["codal_debug"] = None if rows else (
+            "no response (budget/API error)" if raw_codal is None else
+            f"{type(raw_codal).__name__}: " + (", ".join(list(raw_codal.keys())[:12]) if isinstance(raw_codal, dict)
+                                              else json.dumps(raw_codal, ensure_ascii=False)[:300])
+        )
         if rows:
             old = load(f"{dd}/codal.json", {}).get("items", [])
             seen, merged = set(), []
