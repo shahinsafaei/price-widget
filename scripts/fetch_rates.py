@@ -140,6 +140,7 @@ class Api:
     def __init__(self, key, state):
         self.key = key
         self.state = state
+        self.last_error = None   # last failure reason, surfaced in state.json for debugging
 
     def remaining(self, critical):
         limit = DAILY_BUDGET if critical else DAILY_BUDGET - RESERVE
@@ -159,10 +160,18 @@ class Api:
                 with urllib.request.urlopen(req, timeout=60) as r:
                     data = json.loads(r.read().decode("utf-8"))
             except Exception as e:
-                print(f"  {path} via {host}: {type(e).__name__}")
+                body = ""
+                if hasattr(e, "read"):
+                    try:
+                        body = e.read().decode("utf-8", "replace")[:200]
+                    except Exception:
+                        pass
+                self.last_error = f"{host}: {type(e).__name__} {getattr(e, 'code', '')} {body}".strip()
+                print(f"  {path} via {self.last_error}")
                 continue
             if isinstance(data, dict) and (data.get("successful") is False or "code_http" in data):
-                print(f"  {path} via {host}: API error {data.get('message_error') or data.get('status')}")
+                self.last_error = f"{host}: API error {data.get('message_error') or data.get('status')}"
+                print(f"  {path} via {self.last_error}")
                 continue
             if validate and not validate(data):
                 print(f"  {path} via {host}: unexpected shape")
@@ -457,7 +466,7 @@ def main():
         rows = codal_rows(raw_codal)
         # Record the response shape when nothing parses, so a format change is visible.
         state["codal_debug"] = None if rows else (
-            "no response (budget/API error)" if raw_codal is None else
+            f"no response: {api.last_error}" if raw_codal is None else
             f"{type(raw_codal).__name__}: " + (", ".join(list(raw_codal.keys())[:12]) if isinstance(raw_codal, dict)
                                               else json.dumps(raw_codal, ensure_ascii=False)[:300])
         )
