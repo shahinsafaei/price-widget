@@ -40,8 +40,16 @@ from zoneinfo import ZoneInfo
 TEHRAN = ZoneInfo("Asia/Tehran")
 HOSTS = ["https://Api.BrsApi.ir", "https://brsapi.ir/Api"]
 UA = "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36"
-DAILY_BUDGET = int(os.environ.get("DAILY_BUDGET", "900"))
-RESERVE = 80              # always kept free for the critical gold/currency call
+# Hard daily cap. The provider allows 1000/day; stopping at 600 means at least 400
+# requests are ALWAYS left, whatever happens.
+DAILY_BUDGET = int(os.environ.get("DAILY_BUDGET", "600"))
+RESERVE = 150             # of those 600, kept for critical calls (gold/currency, codal)
+
+# Minimum minutes between fetches of each kind. Runs may be triggered as often as
+# every minute (external trigger); these keep usage predictable regardless:
+#   gold 3' ≈ 240/day (09-21) · bourse 5' ≈ 100 · extra indices 15' ≈ 30 ·
+#   commodity/codal 30' ≈ 50 · crypto 5' (free source, no quota)  → ≈ 420/day
+TIERS = {"gold": 3, "bourse": 5, "idx_more": 15, "commodity": 30, "codal": 30, "crypto": 5}
 BACKFILL_PER_RUN = 25
 BACKFILL_DAILY_CAP = 300      # history backfill never uses more than this per day
 HISTORY_DAYS = 500
@@ -597,7 +605,6 @@ def main():
     mins = now.hour * 60 + now.minute
     bourse_day = now.weekday() in (5, 6, 0, 1, 2)          # Sat–Wed
     bourse_window = bourse_day and 8 * 60 + 55 <= mins <= 13 * 60 + 15
-    hourly = now.minute < 15
 
     dd = args.data_dir
     global LOGO_DIR
@@ -610,6 +617,14 @@ def main():
     # (Bug fix: they used to be retried every run, burning ~60 calls each time.)
     if state.get("failed_day") != today:
         state["failed_day"], state["failed"], state["bf_calls"] = today, [], 0
+    last = state.setdefault("last", {})
+
+    def due(tier):
+        return manual or epoch - last.get(tier, 0) >= TIERS[tier] * 60 - 20
+
+    def mark(tier):
+        last[tier] = epoch
+
     api = Api(key, state)
     print(f"Tehran {now:%a %H:%M}  bourse_window={bourse_window} manual={manual} budget used={state['calls']}/{DAILY_BUDGET}")
 
@@ -619,15 +634,20 @@ def main():
 
     # 1) gold / currency / crypto — critical
     gold = None
-    if market_hours:
+    gold_due = market_hours and due("gold")
+    if gold_due:
+        mark("gold")
         gold = api.get("Market/Gold_Currency.php", critical=True, validate=lambda d: isinstance(d, dict) and all(
             isinstance(d.get(k), list) for k in ("gold", "currency", "cryptocurrency")))
     gold_ok = gold is not None
     if not gold_ok:
-        if market_hours:
-            print("::error::Gold_Currency failed — keeping old gold/currency prices")
+        if gold_due:
+            print("::warning::Gold_Currency failed/over budget — keeping previous gold/currency prices")
         gold = load(f"{dd}/latest.json", None) or load(f"{args.main_dir}/latest.json", None)
-    crypto_ok = bool(gold) and refresh_crypto(gold, now)
+    crypto_ok = False
+    if gold and due("crypto"):
+        mark("crypto")
+        crypto_ok = refresh_crypto(gold, now)
     if gold and (gold_ok or crypto_ok):
         save(f"{args.main_dir}/latest.json", gold)
         save(f"{dd}/latest.json", gold)
@@ -645,11 +665,20 @@ def main():
               "indices": prev.get("indices", []), "stocks": prev.get("stocks", []),
               "commodity": prev.get("commodity", [])}
     raw_stocks = None
-    if bourse_window or manual or not prev.get("stocks"):
+    # A failed fetch waits for the next interval — never "retry every run because the file is missing".
+    if due("bourse") and (bourse_window or manual or not prev.get("stocks")):
+        mark("bourse")
         im = api.get("Tsetmc/Index.php", {"type": 1})
-        ifa = api.get("Tsetmc/Index.php", {"type": 2})
-        isel = api.get("Tsetmc/Index.php", {"type": 3})
+        more = due("idx_more") or not prev.get("indices")
+        if more:
+            mark("idx_more")
+        ifa = api.get("Tsetmc/Index.php", {"type": 2}) if more else None
+        isel = api.get("Tsetmc/Index.php", {"type": 3}) if more else None
         idx = index_items(im, ifa, isel, epoch)
+        if idx and not more:
+            # keep the previous Farabourse/selected indices between their 15-minute refreshes
+            fresh = {x["symbol"] for x in idx}
+            idx += [x for x in prev.get("indices", []) if x.get("symbol") not in fresh and x.get("symbol") != "IDX_EQUAL"]
         if idx:
             market["indices"] = idx
         raw_stocks = api.get("Tsetmc/AllSymbols.php", {"type": 1}, validate=lambda d: isinstance(d, list) and d)
@@ -658,14 +687,16 @@ def main():
             if light:
                 market["stocks"] = light
                 save(f"{dd}/detail.json", {"updated": epoch, "s": detail})
-    if hourly or manual or not prev.get("commodity"):
+    if due("commodity"):
+        mark("commodity")
         com = commodity_items(api.get("Market/Commodity.php"), epoch)
         if com:
             market["commodity"] = com
     save(f"{dd}/market.json", market)
 
     # 3) codal — hourly, latest announcements for all symbols in one call
-    if hourly or manual or not os.path.exists(f"{dd}/codal.json"):
+    if due("codal"):
+        mark("codal")
         # Uses the reserved budget: ~12 calls/day, and it must not starve when backfill runs.
         raw_codal = api.get("Codal/Announcement.php", {"page": 1}, critical=True)
         rows = codal_rows(raw_codal)
@@ -730,7 +761,9 @@ def main():
 
     save(f"{dd}/state.json", state)
     print(f"done — API calls today: {state['calls']}/{DAILY_BUDGET}")
-    return 0 if gold_ok else 1
+    # Never fail the job just because a provider call failed or the budget is used
+    # up — the data branch still gets the fresh crypto/analysis and old prices stay.
+    return 0
 
 
 if __name__ == "__main__":

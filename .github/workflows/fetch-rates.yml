@@ -5,7 +5,14 @@ on:
     # Every 15 minutes, around the clock. fetch_rates.py decides what to fetch:
     # gold/currency/bourse only 09:00-21:00 Tehran; at night crypto only (free source).
     - cron: '0,15,30,45 * * * *'
-  workflow_dispatch: {}
+  # Any trigger (button, external pinger) follows the per-tier intervals in
+  # fetch_rates.py; only "force" fetches everything immediately.
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Fetch everything now, ignoring intervals (uses more API quota)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -42,7 +49,7 @@ jobs:
         if: steps.hours.outputs.within == 'true'
         env:
           BRSAPI_KEY: ${{ secrets.BRSAPI_KEY }}
-          MANUAL: ${{ github.event_name == 'workflow_dispatch' && '1' || '0' }}
+          MANUAL: ${{ inputs.force && '1' || '0' }}
         run: python3 scripts/fetch_rates.py --main-dir data --data-dir databranch
 
       # Rule-based analysis always; AI polish via GitHub Models a few times a day.
@@ -51,7 +58,7 @@ jobs:
         continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          MANUAL: ${{ github.event_name == 'workflow_dispatch' && '1' || '0' }}
+          MANUAL: ${{ inputs.force && '1' || '0' }}
         run: python3 scripts/analysis.py --data-dir databranch
 
       - name: Push data branch

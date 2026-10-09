@@ -170,7 +170,8 @@ def session(date_str, now):
         wd = WEEKDAYS_FA[datetime.date.fromisoformat(dk).weekday()]
     except ValueError:
         wd = ""
-    label = f"{wd} {date_str}".strip()
+    # LRI…PDI keeps "1405/07/15" in left-to-right order inside the Persian sentence.
+    label = f"{wd} \u2066{date_str}\u2069".strip()
     return f"در آخرین جلسه‌ی معاملاتی ({label})", f"🔒 بازار بسته — داده‌ی {label}"
 
 
