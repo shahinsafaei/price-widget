@@ -1,0 +1,91 @@
+name: Fetch Rates
+
+on:
+  schedule:
+    # Every 15 minutes, 05:00-16:59 UTC (= 08:30-20:29 Tehran, UTC+3:30)
+    - cron: '0,15,30,45 5-16 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  models: read      # free GitHub Models quota for the AI analysis text
+
+concurrency:
+  group: fetch-rates
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check Tehran market hours
+        id: hours
+        run: |
+          hour=$(TZ='Asia/Tehran' date +%H)
+          hour=$((10#$hour))
+          echo "Current Tehran hour: $hour"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || { [ "$hour" -ge 9 ] && [ "$hour" -lt 21 ]; }; then
+            echo "within=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "within=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Heavy data (market, history, order books, codal, budget state) lives on
+      # the separate `data` branch, force-pushed as ONE commit each time, so the
+      # main branch's git history doesn't grow by hundreds of KB every 15 min.
+      - name: Load previous data branch
+        if: steps.hours.outputs.within == 'true'
+        run: |
+          mkdir -p databranch
+          if git fetch --depth=1 origin data 2>/dev/null; then
+            git archive FETCH_HEAD | tar -x -C databranch
+          fi
+          ls -la databranch
+
+      - name: Fetch rates (budgeted)
+        if: steps.hours.outputs.within == 'true'
+        env:
+          BRSAPI_KEY: ${{ secrets.BRSAPI_KEY }}
+          MANUAL: ${{ github.event_name == 'workflow_dispatch' && '1' || '0' }}
+        run: python3 scripts/fetch_rates.py --main-dir data --data-dir databranch
+
+      # Rule-based analysis always; AI polish via GitHub Models a few times a day.
+      - name: Market analysis
+        if: always() && steps.hours.outputs.within == 'true'
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MANUAL: ${{ github.event_name == 'workflow_dispatch' && '1' || '0' }}
+        run: python3 scripts/analysis.py --data-dir databranch
+
+      - name: Push data branch
+        if: always() && steps.hours.outputs.within == 'true'
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          [ -n "$(ls -A databranch 2>/dev/null)" ] || exit 0
+          cd databranch
+          git init -q
+          git checkout -q -b data
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -qm "data $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          git push -q -f "https://x-access-token:${TOKEN}@github.com/${{ github.repository }}.git" data
+
+      # latest.json stays on main so app versions before 1.1 keep working.
+      - name: Commit latest.json to main if changed
+        if: always() && steps.hours.outputs.within == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/latest.json
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "update rates $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            git pull --rebase origin ${{ github.ref_name }}
+            git push
+          fi
