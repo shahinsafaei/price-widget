@@ -114,6 +114,71 @@ def j2g(jy, jm, jd):
     return gy, gm + 1, gd
 
 
+def g2j(gy, gm, gd):
+    """Gregorian → Jalali (standard jdf algorithm)."""
+    g_d_m = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334]
+    gy2 = gy + 1 if gm > 2 else gy
+    days = 355666 + 365 * gy + (gy2 + 3) // 4 - (gy2 + 99) // 100 + (gy2 + 399) // 400 + gd + g_d_m[gm - 1]
+    jy = -1595 + 33 * (days // 12053)
+    days %= 12053
+    jy += 4 * (days // 1461)
+    days %= 1461
+    if days > 365:
+        jy += (days - 1) // 365
+        days = (days - 1) % 365
+    if days < 186:
+        return jy, 1 + days // 31, 1 + days % 31
+    return jy, 7 + (days - 186) // 30, 1 + (days - 186) % 30
+
+
+# ----------------------------------------------------------------- crypto (free, 24/7)
+
+# brsapi symbol → CoinGecko id. CoinGecko's free public endpoint needs no key and
+# returns every coin in ONE request, so crypto stays fresh around the clock
+# without touching the paid-provider budget.
+COINGECKO_IDS = {
+    "BTC": "bitcoin", "ETH": "ethereum", "USDT": "tether", "XRP": "ripple", "BNB": "binancecoin",
+    "SOL": "solana", "USDC": "usd-coin", "TRX": "tron", "DOGE": "dogecoin", "ADA": "cardano",
+    "LINK": "chainlink", "XLM": "stellar", "AVAX": "avalanche-2", "SHIB": "shiba-inu", "LTC": "litecoin",
+    "DOT": "polkadot", "UNI": "uniswap", "ATOM": "cosmos", "FIL": "filecoin",
+}
+
+
+def refresh_crypto(gold, now):
+    """Overwrites crypto prices in the gold/currency payload with fresh CoinGecko
+    quotes (USD + 24h change). Returns True if anything was updated."""
+    items = {x["symbol"]: x for x in gold.get("cryptocurrency", []) or [] if isinstance(x, dict) and x.get("symbol") in COINGECKO_IDS}
+    if not items:
+        return False
+    ids = ",".join(COINGECKO_IDS[s] for s in items)
+    url = ("https://api.coingecko.com/api/v3/simple/price?vs_currencies=usd"
+           f"&include_24hr_change=true&include_last_updated_at=true&ids={ids}")
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=30) as r:
+            quotes = json.loads(r.read().decode("utf-8"))
+    except Exception as e:
+        print(f"  crypto (CoinGecko): {type(e).__name__}")
+        return False
+    jy, jm, jd = g2j(now.year, now.month, now.day)
+    updated = 0
+    for sym, it in items.items():
+        q = quotes.get(COINGECKO_IDS[sym]) or {}
+        p = q.get("usd")
+        if p is None:
+            continue
+        pct = q.get("usd_24h_change")
+        it["price"] = ("%.10f" % p).rstrip("0").rstrip(".")
+        it["change_percent"] = round(pct, 2) if pct is not None else None
+        it["change_value"] = round(p - p / (1 + pct / 100), 10) if pct not in (None, -100) else None
+        it["time_unix"] = int(q.get("last_updated_at") or now.timestamp())
+        it["date"] = "%d/%02d/%02d" % (jy, jm, jd)
+        it["time"] = now.strftime("%H:%M")
+        updated += 1
+    print(f"  crypto: {updated} coins updated from CoinGecko")
+    return updated > 0
+
+
 def day_key(v):
     """Any date the API returns (1403/05/01, 2024-07-22, 20240722 …) → 'YYYY-MM-DD' Gregorian."""
     if v is None:
@@ -424,15 +489,31 @@ def main():
     api = Api(key, state)
     print(f"Tehran {now:%a %H:%M}  bourse_window={bourse_window} manual={manual} budget used={state['calls']}/{DAILY_BUDGET}")
 
+    # Gold/currency/bourse only during Tehran market hours; at night the job runs
+    # just for crypto (24/7, free source) and makes no paid-provider calls at all.
+    market_hours = manual or 9 * 60 <= mins < 21 * 60
+
     # 1) gold / currency / crypto — critical
-    gold = api.get("Market/Gold_Currency.php", critical=True, validate=lambda d: isinstance(d, dict) and all(
-        isinstance(d.get(k), list) for k in ("gold", "currency", "cryptocurrency")))
+    gold = None
+    if market_hours:
+        gold = api.get("Market/Gold_Currency.php", critical=True, validate=lambda d: isinstance(d, dict) and all(
+            isinstance(d.get(k), list) for k in ("gold", "currency", "cryptocurrency")))
     gold_ok = gold is not None
-    if gold_ok:
+    if not gold_ok:
+        if market_hours:
+            print("::error::Gold_Currency failed — keeping old gold/currency prices")
+        gold = load(f"{dd}/latest.json", None) or load(f"{args.main_dir}/latest.json", None)
+    crypto_ok = bool(gold) and refresh_crypto(gold, now)
+    if gold and (gold_ok or crypto_ok):
         save(f"{args.main_dir}/latest.json", gold)
         save(f"{dd}/latest.json", gold)
-    else:
-        print("::error::Gold_Currency failed — keeping old latest.json")
+
+    if not market_hours:
+        if gold:
+            update_core_history(dd, [x for x in gold.get("cryptocurrency", []) if isinstance(x, dict)], now)
+        save(f"{dd}/state.json", state)
+        print(f"night run — crypto only ({'ok' if crypto_ok else 'failed'}); API calls today: {state['calls']}")
+        return 0
 
     # 2) market (indices, stocks, commodity)
     prev = load(f"{dd}/market.json", {})
@@ -482,7 +563,7 @@ def main():
 
     # 4) history built from what we already have — zero extra calls
     core = []
-    if gold_ok:
+    if gold:
         for k in ("gold", "currency", "cryptocurrency"):
             core += [x for x in gold.get(k, []) if isinstance(x, dict)]
     core += market["indices"] + market["commodity"]
