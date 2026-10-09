@@ -152,6 +152,28 @@ def rsi_note(v):
     return None
 
 
+# ----------------------------------------------------------------- trading session
+
+WEEKDAYS_FA = ["دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه", "شنبه", "یکشنبه"]
+
+
+def session(date_str, now):
+    """Is this data from today? On Thursdays/Fridays/holidays the bourse data is
+    from the last trading day — saying «امروز» would be wrong.
+    Returns (when, badge): when="امروز" or e.g. "در آخرین جلسه‌ی معاملاتی (چهارشنبه 1405/07/15)",
+    badge=None or e.g. "🔒 بازار بسته — داده‌ی چهارشنبه 1405/07/15"."""
+    from fetch_rates import day_key   # same folder; converts Jalali dates
+    dk = day_key(date_str) if date_str else None
+    if not dk or dk == now.strftime("%Y-%m-%d"):
+        return "امروز", None
+    try:
+        wd = WEEKDAYS_FA[datetime.date.fromisoformat(dk).weekday()]
+    except ValueError:
+        wd = ""
+    label = f"{wd} {date_str}".strip()
+    return f"در آخرین جلسه‌ی معاملاتی ({label})", f"🔒 بازار بسته — داده‌ی {label}"
+
+
 # ----------------------------------------------------------------- engine
 
 class Builder:
@@ -256,14 +278,16 @@ def build(data_dir, now):
     oz = asset_lines(b, sec, "انس جهانی", by_sym.get("XAUUSD"), daily, "XAUUSD", "دلار")
     emami = asset_lines(b, sec, "سکه امامی", by_sym.get("IR_COIN_EMAMI"), daily, "IR_COIN_EMAMI", "تومان")
 
+    fx_when, fx_badge = session((by_sym.get("USD") or {}).get("date"), now)
+    sec["session"] = fx_badge
     if usd and usd["chg"] is not None:
         d = usd["chg"]
         if abs(d) < 0.15:
-            bullet(sec, pick(["دلار امروز تقریباً بدون تغییر بود و بازار ارز آرام است.",
-                              "نرخ دلار امروز در محدوده‌ی دیروز ثابت ماند."], seed + "usd"))
+            bullet(sec, pick([f"دلار {fx_when} تقریباً بدون تغییر بود و بازار ارز آرام بود.",
+                              f"نرخ دلار {fx_when} در محدوده‌ی روز قبل ثابت ماند."], seed + "usd"))
         else:
             verb = "بالا رفت" if d > 0 else "پایین آمد"
-            bullet(sec, f"دلار امروز {pct(d)} {verb} و به {fmt(usd['price'])} تومان رسید.")
+            bullet(sec, f"دلار {fx_when} {pct(d)} {verb} و به {fmt(usd['price'])} تومان رسید.")
         if usd["trend"] in ("up", "down"):
             bullet(sec, f"روند کوتاه‌مدت دلار {TREND_FA[usd['trend']]} است" +
                    (f" و در ۵ روز اخیر {pct(usd['week'])} تغییر کرده." if usd["week"] is not None else "."))
@@ -272,9 +296,9 @@ def build(data_dir, now):
     if usd and g18 and usd["chg"] is not None and g18["chg"] is not None:
         same = (usd["chg"] >= 0) == (g18["chg"] >= 0)
         if same:
-            bullet(sec, f"طلا ({pct(g18['chg'])}) و دلار ({pct(usd['chg'])}) امروز هم‌جهت حرکت کردند.")
+            bullet(sec, f"طلا ({pct(g18['chg'])}) و دلار ({pct(usd['chg'])}) {fx_when} هم‌جهت حرکت کردند.")
         else:
-            bullet(sec, f"طلا ({pct(g18['chg'])}) و دلار ({pct(usd['chg'])}) امروز خلاف جهت هم حرکت کردند؛ "
+            bullet(sec, f"طلا ({pct(g18['chg'])}) و دلار ({pct(usd['chg'])}) {fx_when} خلاف جهت هم حرکت کردند؛ "
                         "در این حالت معمولاً اثر انس جهانی پررنگ‌تر است.")
     if oz and oz["chg"] is not None and abs(oz["chg"]) >= 0.5:
         bullet(sec, f"انس جهانی طلا {pct(oz['chg'])} تغییر کرد که روی قیمت طلای داخلی هم اثر دارد.", tone_of(oz["chg"]))
@@ -291,17 +315,20 @@ def build(data_dir, now):
 
     # ---------- bourse ----------
     stocks = [s for s in market.get("stocks", []) or [] if isinstance(s, dict)]
+    bourse_when, bourse_badge = "امروز", None
     idx = by_sym.get("IDX_MAIN")
     mood = None
     if idx or stocks:
         sec = b.section("bourse", "بورس و فرابورس", "🏛")
+        bourse_when, bourse_badge = session((idx or {}).get("date"), now)
+        sec["session"] = bourse_badge
         ic = num(idx.get("change_percent")) if idx else None
         if idx:
             asset_lines(b, sec, "شاخص کل", idx, daily, "IDX_MAIN", "واحد")
             ew = by_sym.get("IDX_EQUAL")
             ewc = num(ew.get("change_percent")) if ew else None
             if ic is not None:
-                bullet(sec, f"شاخص کل امروز با {pct(ic)} به {fmt(num(idx.get('price')))} واحد رسید.", tone_of(ic))
+                bullet(sec, f"شاخص کل {bourse_when} با {pct(ic)} به {fmt(num(idx.get('price')))} واحد رسید.", tone_of(ic))
             if ic is not None and ewc is not None and (ic >= 0) != (ewc >= 0):
                 bullet(sec, f"شاخص هم‌وزن ({pct(ewc)}) خلاف شاخص کل حرکت کرد؛ یعنی "
                        + ("رشد بیشتر از سهم‌های بزرگ بوده و اکثر نمادها همراهی نکردند." if ic > ewc else "نمادهای کوچک‌تر بهتر از بزرگ‌ها عمل کردند."))
@@ -395,7 +422,7 @@ def build(data_dir, now):
     # ---------- headline (template) ----------
     head = []
     if mood:
-        head.append(f"بورس امروز در فاز «{mood['label']}» {mood['emoji']}")
+        head.append(f"بورس {'امروز' if not bourse_badge else 'در آخرین جلسه'} در فاز «{mood['label']}» {mood['emoji']}")
     if usd and usd["chg"] is not None:
         head.append(f"دلار {pct(usd['chg'])}")
     if g18 and g18["chg"] is not None:
@@ -405,9 +432,9 @@ def build(data_dir, now):
         s["paragraph"] = paragraph(s["bullets"], seed + s["id"])
     intro = []
     if mood:
-        intro.append(f"فضای بورس امروز «{mood['label']}» ارزیابی می‌شود")
+        intro.append(f"فضای بورس {bourse_when} «{mood['label']}» بود" if bourse_badge else f"فضای بورس امروز «{mood['label']}» ارزیابی می‌شود")
     if usd and usd["chg"] is not None:
-        intro.append(f"دلار {pct(usd['chg'])} تغییر کرد")
+        intro.append(f"دلار {'' if not fx_badge else 'در آخرین روز کاری '}{pct(usd['chg'])} تغییر کرد")
     if g18 and g18["chg"] is not None:
         intro.append(f"طلای ۱۸ عیار {pct(g18['chg'])} جابه‌جا شد")
     if len(intro) > 1:
@@ -419,6 +446,10 @@ def build(data_dir, now):
         ([intro_text] if intro_text else []) +
         [s["paragraph"] for s in b.sections if s["bullets"] and s["id"] != "codal"]
     )
+    if bourse_badge:
+        b.fact(f"بورس امروز تعطیل است؛ داده‌های بورس مربوط به {bourse_when.replace('در ', '')} است")
+    if fx_badge:
+        b.fact(f"بازار ارز و طلا امروز بسته است؛ داده‌ها مربوط به {fx_when.replace('در ', '')} است")
     return {
         "headline": headline,
         "mood": mood,
@@ -437,7 +468,8 @@ SYSTEM = (
     "۱. هیچ عددی جز اعداد موجود در داده‌ها ننویس؛ اعداد را دقیقاً با همان رقم‌ها (لاتین) بنویس.\n"
     "۲. پیش‌بینی قیمت و توصیه‌ی خرید یا فروش ممنوع است.\n"
     "۳. چیزی از خودت (اخبار، دلیل سیاسی، رویداد) اضافه نکن؛ فقط ارتباط بین همین داده‌ها را توضیح بده.\n"
-    "۴. قالب: خط اول یک تیتر کوتاه (حداکثر ۱۲ کلمه)، سپس ۲ یا ۳ پاراگراف کوتاه. بدون Markdown و بدون فهرست."
+    "۴. اگر در داده‌ها گفته شده بازار بسته است، آن بخش را با «در آخرین جلسه‌ی معاملاتی» توصیف کن، نه «امروز».\n"
+    "۵. قالب: خط اول یک تیتر کوتاه (حداکثر ۱۲ کلمه)، سپس ۲ یا ۳ پاراگراف کوتاه. بدون Markdown و بدون فهرست."
 )
 
 NUM_RE = re.compile(r"\d[\d,]*(?:\.\d+)?")
