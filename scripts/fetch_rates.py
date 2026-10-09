@@ -30,6 +30,7 @@ import datetime
 import hashlib
 import json
 import os
+import re
 import sys
 import time
 import urllib.parse
@@ -168,6 +169,40 @@ CRYPTO_SKIP_IDS = {
 }
 
 
+LOGO_DIR = None          # set in main(): <data-dir>/logos — persisted on the data branch
+LOGO_BUDGET = 30         # max new logo downloads per run (first run fills ~100 in 4 runs)
+
+
+def ensure_logo(sym, image_url):
+    """Downloads a coin's official logo once (CoinGecko 'small', ~50px, ~2.5 KB) and
+    returns its path relative to the data branch, or None. Served from the data
+    branch so the app never has to reach the logo CDN directly."""
+    global LOGO_BUDGET
+    if not LOGO_DIR or not image_url or not re.fullmatch(r"[A-Z0-9]{1,15}", sym):
+        return None
+    rel = f"logos/{sym}.png"
+    path = os.path.join(LOGO_DIR, f"{sym}.png")
+    if os.path.exists(path) and os.path.getsize(path) > 100:
+        return rel
+    if LOGO_BUDGET <= 0:
+        return None
+    LOGO_BUDGET -= 1
+    url = image_url.replace("/large/", "/small/")
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": UA})
+        with urllib.request.urlopen(req, timeout=20) as r:
+            data = r.read(200_000)
+        if not data.startswith(bytes([0x89]) + b"PNG"):
+            return None          # only PNGs (the app decodes them as bitmaps)
+        os.makedirs(LOGO_DIR, exist_ok=True)
+        with open(path, "wb") as f:
+            f.write(data)
+        return rel
+    except Exception as e:
+        print(f"  logo {sym}: {type(e).__name__}")
+        return None
+
+
 def _is_stable(c):
     """Generic stablecoin filter for coins not in the skip list."""
     sym = (c.get("symbol") or "").upper()
@@ -213,6 +248,7 @@ def refresh_crypto_top(gold, now):
             "x_volume": c.get("total_volume"),
             "x_high": c.get("high_24h"),
             "x_low": c.get("low_24h"),
+            "x_logo": ensure_logo(sym, c.get("image")),
         })
         if len(out) >= TOP_CRYPTO:
             break
@@ -564,6 +600,8 @@ def main():
     hourly = now.minute < 15
 
     dd = args.data_dir
+    global LOGO_DIR
+    LOGO_DIR = os.path.join(dd, "logos")
     state = load(f"{dd}/state.json", {})
     if state.get("day") != today:
         state.update(day=today, calls=0)
