@@ -49,7 +49,24 @@ RESERVE = 150             # of those 600, kept for critical calls (gold/currency
 # every minute (external trigger); these keep usage predictable regardless:
 #   gold 3' ≈ 240/day (09-21) · bourse 5' ≈ 100 · extra indices 15' ≈ 30 ·
 #   commodity/codal 30' ≈ 50 · crypto 5' (free source, no quota)  → ≈ 420/day
-TIERS = {"gold": 3, "bourse": 5, "idx_more": 15, "commodity": 30, "codal": 30, "crypto": 5}
+TIERS = {"gold": 2, "bourse": 5, "idx_more": 15, "commodity": 30, "codal": 30, "crypto": 5}
+
+
+def gold_interval(now, same_count):
+    """Minutes between gold/currency fetches. The free gold/coin/dollar market is
+    active roughly 10:30–17:30 Tehran (Sat–Thu): fetch every 2' there. Around it
+    and on Fridays, every 15' just to catch occasional moves. If prices haven't
+    changed for several fetches in a row, slow down (they'll speed back up on the
+    first change)."""
+    m = now.hour * 60 + now.minute
+    if now.weekday() == 4 or not (10 * 60 + 30 <= m < 17 * 60 + 30):
+        return 15
+    return 2 if same_count < 4 else 6
+
+
+def bourse_interval(now):
+    """Every 3' in the first half hour (most volatile), then every 5'."""
+    return 3 if now.hour == 9 and now.minute < 30 else 5
 BACKFILL_PER_RUN = 25
 BACKFILL_DAILY_CAP = 300      # history backfill never uses more than this per day
 HISTORY_DAYS = 500
@@ -604,7 +621,9 @@ def main():
     epoch = int(now.timestamp())
     mins = now.hour * 60 + now.minute
     bourse_day = now.weekday() in (5, 6, 0, 1, 2)          # Sat–Wed
-    bourse_window = bourse_day and 8 * 60 + 55 <= mins <= 13 * 60 + 15
+    # Trading 09:00–12:30; one more fetch up to 12:45 picks up the final/closing prices.
+    bourse_window = bourse_day and 9 * 60 <= mins <= 12 * 60 + 45
+    opening = datetime.datetime.combine(now.date(), datetime.time(9, 0), tzinfo=now.tzinfo).timestamp()
 
     dd = args.data_dir
     global LOGO_DIR
@@ -619,8 +638,8 @@ def main():
         state["failed_day"], state["failed"], state["bf_calls"] = today, [], 0
     last = state.setdefault("last", {})
 
-    def due(tier):
-        return manual or epoch - last.get(tier, 0) >= TIERS[tier] * 60 - 20
+    def due(tier, minutes=None):
+        return manual or epoch - last.get(tier, 0) >= (minutes or TIERS[tier]) * 60 - 20
 
     def mark(tier):
         last[tier] = epoch
@@ -634,12 +653,17 @@ def main():
 
     # 1) gold / currency / crypto — critical
     gold = None
-    gold_due = market_hours and due("gold")
+    gold_due = market_hours and due("gold", gold_interval(now, state.get("gold_same", 0)))
     if gold_due:
         mark("gold")
         gold = api.get("Market/Gold_Currency.php", critical=True, validate=lambda d: isinstance(d, dict) and all(
             isinstance(d.get(k), list) for k in ("gold", "currency", "cryptocurrency")))
     gold_ok = gold is not None
+    if gold_ok:
+        stamp = max((num(x.get("time_unix")) or 0) for k in ("gold", "currency")
+                    for x in gold.get(k, []) if isinstance(x, dict) and x.get("symbol") != "USDT_IRT")
+        state["gold_same"] = state.get("gold_same", 0) + 1 if stamp == state.get("gold_stamp") else 0
+        state["gold_stamp"] = stamp
     if not gold_ok:
         if gold_due:
             print("::warning::Gold_Currency failed/over budget — keeping previous gold/currency prices")
@@ -666,7 +690,9 @@ def main():
               "commodity": prev.get("commodity", [])}
     raw_stocks = None
     # A failed fetch waits for the next interval — never "retry every run because the file is missing".
-    if due("bourse") and (bourse_window or manual or not prev.get("stocks")):
+    # First fetch right at the 09:00 open (whatever the last fetch time), then every 3–5'.
+    bourse_due = due("bourse", bourse_interval(now)) or (bourse_window and last.get("bourse", 0) < opening)
+    if bourse_due and (bourse_window or manual or not prev.get("stocks")):
         mark("bourse")
         im = api.get("Tsetmc/Index.php", {"type": 1})
         more = due("idx_more") or not prev.get("indices")
