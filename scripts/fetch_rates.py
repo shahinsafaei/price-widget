@@ -388,7 +388,10 @@ class Api:
                 print(f"  {path} via {self.last_error}")
                 continue
             if validate and not validate(data):
-                print(f"  {path} via {host}: unexpected shape")
+                sample = json.dumps(data, ensure_ascii=False)[:400]
+                self.last_error = f"{host}: unexpected shape: {sample}"
+                errs = self.state.setdefault("errors", {}); errs[path] = (errs.get(path, "") + " || " + self.last_error).strip(" |")
+                print(f"  {path} via {self.last_error}")
                 continue
             return data
         return None
