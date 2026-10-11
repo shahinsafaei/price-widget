@@ -379,10 +379,12 @@ class Api:
                     except Exception:
                         pass
                 self.last_error = f"{host}: {type(e).__name__} {getattr(e, 'code', '')} {body}".strip()
+                self.state.setdefault("errors", {})[path] = self.last_error[:300]
                 print(f"  {path} via {self.last_error}")
                 continue
             if isinstance(data, dict) and (data.get("successful") is False or "code_http" in data):
                 self.last_error = f"{host}: API error {data.get('message_error') or data.get('status')}"
+                self.state.setdefault("errors", {})[path] = self.last_error[:300]
                 print(f"  {path} via {self.last_error}")
                 continue
             if validate and not validate(data):
@@ -636,6 +638,7 @@ def main():
     # (Bug fix: they used to be retried every run, burning ~60 calls each time.)
     if state.get("failed_day") != today:
         state["failed_day"], state["failed"], state["bf_calls"] = today, [], 0
+    state["errors"] = {}
     last = state.setdefault("last", {})
 
     def due(tier, minutes=None):
