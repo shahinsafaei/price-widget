@@ -379,12 +379,12 @@ class Api:
                     except Exception:
                         pass
                 self.last_error = f"{host}: {type(e).__name__} {getattr(e, 'code', '')} {body}".strip()
-                self.state.setdefault("errors", {})[path] = self.last_error[:300]
+                errs = self.state.setdefault("errors", {}); errs[path] = (errs.get(path, "") + " || " + self.last_error[:250]).strip(" |")
                 print(f"  {path} via {self.last_error}")
                 continue
             if isinstance(data, dict) and (data.get("successful") is False or "code_http" in data):
                 self.last_error = f"{host}: API error {data.get('message_error') or data.get('status')}"
-                self.state.setdefault("errors", {})[path] = self.last_error[:300]
+                errs = self.state.setdefault("errors", {}); errs[path] = (errs.get(path, "") + " || " + self.last_error[:250]).strip(" |")
                 print(f"  {path} via {self.last_error}")
                 continue
             if validate and not validate(data):
