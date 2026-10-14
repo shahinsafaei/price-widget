@@ -195,6 +195,41 @@ CRYPTO_SKIP_IDS = {
 }
 
 
+CG_IDS = {}              # symbol → CoinGecko id, filled by refresh_crypto_top()
+CG_BACKFILL_PER_RUN = 4  # coins whose 180-day history is fetched per run (free source)
+
+
+def backfill_crypto_history(data_dir, state):
+    """Fills daily history for crypto from CoinGecko's free market_chart (once per
+    coin), so charts have no gaps — e.g. days when our job didn't run."""
+    done = set(state.setdefault("cg_bf", []))
+    todo = [(sym, cid) for sym, cid in CG_IDS.items() if cid and sym not in done][:CG_BACKFILL_PER_RUN]
+    if not todo:
+        return
+    path = f"{data_dir}/history/daily_core.json"
+    daily = load(path, {})
+    for sym, cid in todo:
+        url = f"https://api.coingecko.com/api/v3/coins/{cid}/market_chart?vs_currency=usd&days=180&interval=daily"
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json"})
+            with urllib.request.urlopen(req, timeout=30) as r:
+                prices = json.loads(r.read().decode("utf-8")).get("prices") or []
+        except Exception as e:
+            print(f"  crypto history {sym}: {type(e).__name__} — will retry next run")
+            break          # most likely rate-limited; stop for this run
+        series = daily.setdefault(sym, [])
+        for ms, p in prices:
+            if p is None:
+                continue
+            day = datetime.datetime.fromtimestamp(ms / 1000, TEHRAN).strftime("%Y-%m-%d")
+            merge_candle(series, day, p, p, p, p, overwrite=False)   # never overwrite our own candles
+        daily[sym] = series[-HISTORY_DAYS:]
+        state["cg_bf"].append(sym)
+        time.sleep(1.5)
+    save(path, daily)
+    print(f"  crypto history backfilled: {len(state['cg_bf'])}/{len(CG_IDS)} coins")
+
+
 LOGO_DIR = None          # set in main(): <data-dir>/logos — persisted on the data branch
 LOGO_BUDGET = 30         # max new logo downloads per run (first run fills ~100 in 4 runs)
 
@@ -258,6 +293,7 @@ def refresh_crypto_top(gold, now):
         if not sym or p is None or c.get("id") in CRYPTO_SKIP_IDS or _is_stable(c) or sym in seen:
             continue
         seen.add(sym)
+        CG_IDS[sym] = c.get("id")
         pct = c.get("price_change_percentage_24h")
         out.append({
             "symbol": sym,
@@ -727,6 +763,7 @@ def main():
     if not market_hours:
         if gold:
             update_core_history(dd, [x for x in gold.get("cryptocurrency", []) if isinstance(x, dict)], now)
+        backfill_crypto_history(dd, state)
         save(f"{dd}/state.json", state)
         print(f"night run — crypto only ({'ok' if crypto_ok else 'failed'}); API calls today: {state['calls']}")
         return 0
@@ -797,6 +834,7 @@ def main():
             core += [x for x in gold.get(k, []) if isinstance(x, dict)]
     core += market["indices"] + market["commodity"]
     update_core_history(dd, core, now)
+    backfill_crypto_history(dd, state)
 
     shards = Shards(dd)
     if raw_stocks and bourse_day:

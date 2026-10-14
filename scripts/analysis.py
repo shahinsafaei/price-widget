@@ -296,6 +296,19 @@ def build(data_dir, now):
         gap = (usdt["price"] / usd["price"] - 1) * 100
         if abs(gap) >= 0.5:
             bullet(sec, f"تتر {pct(gap)} {'گران‌تر' if gap > 0 else 'ارزان‌تر'} از دلار آزاد معامله می‌شود.")
+    fx_list = [x for x in gold.get("currency", []) or []
+               if isinstance(x, dict) and x.get("symbol") != "USDT_IRT" and num(x.get("change_percent")) is not None]
+    if len(fx_list) >= 5:
+        up = sum(1 for x in fx_list if num(x["change_percent"]) > 0)
+        dn = sum(1 for x in fx_list if num(x["change_percent"]) < 0)
+        metric(sec, "ارزهای گران‌شده", f"{up} از {len(fx_list)}", tone_of(up - dn, 0))
+        b.fact(f"از {len(fx_list)} ارز، {up} ارز گران‌تر و {dn} ارز ارزان‌تر شدند")
+        mood_fx = ("؛ موج افزایشی در کل بازار ارز دیده می‌شود." if up >= 0.7 * len(fx_list)
+                   else "؛ بازار ارز رو به آرامش و کاهش است." if dn >= 0.7 * len(fx_list) else "؛ بازار ارز یکدست نیست.")
+        bullet(sec, f"از {len(fx_list)} ارز، {up} ارز گران‌تر و {dn} ارز ارزان‌تر شدند{mood_fx}")
+        movers = sorted(fx_list, key=lambda x: -abs(num(x["change_percent"])))[:3]
+        if movers and abs(num(movers[0]["change_percent"])) >= 0.3:
+            bullet(sec, "بیشترین تغییر را " + "، ".join(f"{x.get('name')} ({pct(num(x['change_percent']))})" for x in movers) + " داشتند.")
     # A rising dollar is good for some users and bad for others — no colored judgment here.
     sec["tone"] = "neutral"
 
@@ -333,6 +346,19 @@ def build(data_dir, now):
         level = "بالا" if bubble > 15 else "متوسط" if bubble > 5 else "کم"
         bullet(sec, f"حباب سکه امامی حدود {pct(bubble)} است (سطح {level}).",
                "negative" if bubble > 15 else "neutral")
+    coins = [by_sym.get(k) for k in ("IR_COIN_BAHAR", "IR_COIN_HALF", "IR_COIN_QUARTER", "IR_COIN_1G")]
+    coins = [c for c in coins if c and num(c.get("change_percent")) is not None]
+    if coins:
+        avg = sum(num(c["change_percent"]) for c in coins) / len(coins)
+        best = max(coins, key=lambda c: abs(num(c["change_percent"])))
+        metric(sec, "میانگین تغییر سکه‌ها", pct(avg), tone_of(avg))
+        b.fact(f"میانگین تغییر سکه‌ها {pct(avg)}؛ {best.get('name')} {pct(num(best['change_percent']))}")
+        bullet(sec, f"سکه‌ها به‌طور میانگین {pct(avg)} تغییر کردند و {best.get('name')} با "
+                    f"{pct(num(best['change_percent']))} بیشترین جابه‌جایی را داشت.", tone_of(avg))
+    melted = by_sym.get("IR_GOLD_MELTED")
+    if melted and num(melted.get("change_percent")) is not None and abs(num(melted["change_percent"])) >= 0.3:
+        bullet(sec, f"طلای آب‌شده {pct(num(melted['change_percent']))} تغییر کرد و به {fmt(num(melted.get('price')))} تومان رسید.",
+               tone_of(num(melted["change_percent"])))
     sec["tone"] = tone_of(g18["chg"]) if g18 else "neutral"
 
     # ---------- bourse ----------
@@ -430,7 +456,29 @@ def build(data_dir, now):
                    + (f" و روند کوتاه‌مدتش {TREND_FA[bt['trend']]} است." if bt["trend"] else "."), tone_of(bt["chg"]))
         if bt and et and bt["chg"] is not None and et["chg"] is not None and abs(et["chg"] - bt["chg"]) > 2:
             bullet(sec, f"اتریوم ({pct(et['chg'])}) " + ("قوی‌تر" if et["chg"] > bt["chg"] else "ضعیف‌تر") + " از بیت‌کوین عمل کرد.")
-        sec["tone"] = tone_of(bt["chg"] if bt else None)
+        cl = [x for x in gold.get("cryptocurrency", []) or []
+              if isinstance(x, dict) and x.get("symbol") not in ("USDT", "USDC") and num(x.get("change_percent")) is not None]
+        cbreadth = None
+        if len(cl) >= 10:
+            up = sum(1 for x in cl if num(x["change_percent"]) > 0)
+            cbreadth = up / len(cl) * 100
+            metric(sec, "ارزهای مثبت", f"{up} از {len(cl)}", tone_of(cbreadth - 50, 5))
+            b.fact(f"از {len(cl)} ارز دیجیتال برتر، {up} ارز مثبت بودند")
+            bullet(sec, f"از {len(cl)} ارز دیجیتال برتر، {up} ارز در ۲۴ ساعت گذشته رشد کردند"
+                        + ("؛ فضای بازار کریپتو مثبت است." if cbreadth >= 60 else "؛ فضای بازار کریپتو منفی است." if cbreadth <= 40 else "؛ بازار دوقطبی است."),
+                   tone_of(cbreadth - 50, 5))
+            ranked = sorted(cl, key=lambda x: num(x["change_percent"]))
+            gain = [x for x in ranked[::-1][:3] if num(x["change_percent"]) > 0]
+            lose = [x for x in ranked[:3] if num(x["change_percent"]) < 0]
+            if gain:
+                bullet(sec, "بیشترین رشد: " + "، ".join(f"{x.get('name')} ({pct(num(x['change_percent']))})" for x in gain) + ".", "positive")
+            if lose:
+                bullet(sec, "بیشترین افت: " + "، ".join(f"{x.get('name')} ({pct(num(x['change_percent']))})" for x in lose) + ".", "negative")
+            mcap = sum(num(x.get("x_mcap")) or 0 for x in gold.get("cryptocurrency", []) or [] if isinstance(x, dict))
+            if mcap > 0:
+                metric(sec, "ارزش کل بازار (۱۰۰ ارز)", f"{mcap / 1e12:.2f} تریلیون دلار")
+                b.fact(f"ارزش کل بازار ۱۰۰ ارز برتر {mcap / 1e12:.2f} تریلیون دلار")
+        sec["tone"] = tone_of(cbreadth - 50, 5) if cbreadth is not None else tone_of(bt["chg"] if bt else None)
 
     # ---------- codal ----------
     today_items = [c for c in codal if c.get("title")][:40]
