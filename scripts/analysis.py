@@ -271,13 +271,11 @@ def build(data_dir, now):
     for it in market.get("indices", []) or []:
         by_sym[it.get("symbol")] = it
 
-    # ---------- currency & gold ----------
-    sec = b.section("fx", "ارز و طلا", "💵")
+    # ---------- currency ----------
+    sec = b.section("fx", "ارز", "💵")
     usd = asset_lines(b, sec, "دلار", by_sym.get("USD"), daily, "USD", "تومان")
     usdt = asset_lines(b, sec, "تتر", by_sym.get("USDT_IRT"), daily, "USDT_IRT", "تومان")
-    g18 = asset_lines(b, sec, "طلای ۱۸ عیار", by_sym.get("IR_GOLD_18K"), daily, "IR_GOLD_18K", "تومان")
-    oz = asset_lines(b, sec, "انس جهانی", by_sym.get("XAUUSD"), daily, "XAUUSD", "دلار")
-    emami = asset_lines(b, sec, "سکه امامی", by_sym.get("IR_COIN_EMAMI"), daily, "IR_COIN_EMAMI", "تومان")
+    asset_lines(b, sec, "یورو", by_sym.get("EUR"), daily, "EUR", "تومان")
 
     fx_when, fx_badge = session((by_sym.get("USD") or {}).get("date"), now)
     sec["session"] = fx_badge
@@ -294,12 +292,36 @@ def build(data_dir, now):
                    (f" و در ۵ روز اخیر {pct(usd['week'])} تغییر کرده." if usd["week"] is not None else "."))
         if rsi_note(usd["rsi"]):
             bullet(sec, f"شاخص RSI دلار روی {usd['rsi']:.0f} است ({rsi_note(usd['rsi'])}) — احتمال نوسان برگشتی بیشتر می‌شود.")
+    if usd and usdt and usd["price"] and usdt["price"]:
+        gap = (usdt["price"] / usd["price"] - 1) * 100
+        if abs(gap) >= 0.5:
+            bullet(sec, f"تتر {pct(gap)} {'گران‌تر' if gap > 0 else 'ارزان‌تر'} از دلار آزاد معامله می‌شود.")
+    # A rising dollar is good for some users and bad for others — no colored judgment here.
+    sec["tone"] = "neutral"
+
+    # ---------- gold & coin ----------
+    sec = b.section("gold", "طلا و سکه", "🪙")
+    g18 = asset_lines(b, sec, "طلای ۱۸ عیار", by_sym.get("IR_GOLD_18K"), daily, "IR_GOLD_18K", "تومان")
+    oz = asset_lines(b, sec, "انس جهانی", by_sym.get("XAUUSD"), daily, "XAUUSD", "دلار")
+    emami = asset_lines(b, sec, "سکه امامی", by_sym.get("IR_COIN_EMAMI"), daily, "IR_COIN_EMAMI", "تومان")
+    gold_when, gold_badge = session((by_sym.get("IR_GOLD_18K") or {}).get("date"), now)
+    sec["session"] = gold_badge
+    if g18 and g18["chg"] is not None:
+        d = g18["chg"]
+        if abs(d) < 0.15:
+            bullet(sec, f"طلای ۱۸ عیار {gold_when} تقریباً بدون تغییر و در {fmt(g18['price'])} تومان ماند.")
+        else:
+            bullet(sec, f"طلای ۱۸ عیار {gold_when} {pct(d)} {'گران' if d > 0 else 'ارزان'} شد و به {fmt(g18['price'])} تومان رسید.",
+                   tone_of(d))
+        if g18["trend"] in ("up", "down"):
+            bullet(sec, f"روند کوتاه‌مدت طلا {TREND_FA[g18['trend']]} است" +
+                   (f" و در ۵ روز اخیر {pct(g18['week'])} تغییر کرده." if g18["week"] is not None else "."))
     if usd and g18 and usd["chg"] is not None and g18["chg"] is not None:
         same = (usd["chg"] >= 0) == (g18["chg"] >= 0)
         if same:
-            bullet(sec, f"طلا ({pct(g18['chg'])}) و دلار ({pct(usd['chg'])}) {fx_when} هم‌جهت حرکت کردند.")
+            bullet(sec, f"طلا ({pct(g18['chg'])}) و دلار ({pct(usd['chg'])}) {gold_when} هم‌جهت حرکت کردند.")
         else:
-            bullet(sec, f"طلا ({pct(g18['chg'])}) و دلار ({pct(usd['chg'])}) {fx_when} خلاف جهت هم حرکت کردند؛ "
+            bullet(sec, f"طلا ({pct(g18['chg'])}) و دلار ({pct(usd['chg'])}) {gold_when} خلاف جهت هم حرکت کردند؛ "
                         "در این حالت معمولاً اثر انس جهانی پررنگ‌تر است.")
     if oz and oz["chg"] is not None and abs(oz["chg"]) >= 0.5:
         bullet(sec, f"انس جهانی طلا {pct(oz['chg'])} تغییر کرد که روی قیمت طلای داخلی هم اثر دارد.", tone_of(oz["chg"]))
@@ -311,8 +333,7 @@ def build(data_dir, now):
         level = "بالا" if bubble > 15 else "متوسط" if bubble > 5 else "کم"
         bullet(sec, f"حباب سکه امامی حدود {pct(bubble)} است (سطح {level}).",
                "negative" if bubble > 15 else "neutral")
-    # A rising dollar is good for some users and bad for others — no colored judgment here.
-    sec["tone"] = "neutral"
+    sec["tone"] = tone_of(g18["chg"]) if g18 else "neutral"
 
     # ---------- bourse ----------
     stocks = [s for s in market.get("stocks", []) or [] if isinstance(s, dict)]
