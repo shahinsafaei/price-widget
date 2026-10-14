@@ -38,7 +38,8 @@ import urllib.request
 from zoneinfo import ZoneInfo
 
 TEHRAN = ZoneInfo("Asia/Tehran")
-HOSTS = ["https://Api.BrsApi.ir", "https://brsapi.ir/Api"]
+# The old "brsapi.ir/Api" address now returns 404 — trying it only doubled the calls.
+HOSTS = ["https://Api.BrsApi.ir"]
 UA = "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36"
 # Hard daily cap. The provider allows 1000/day; stopping at 600 means at least 400
 # requests are ALWAYS left, whatever happens.
@@ -358,43 +359,57 @@ class Api:
         limit = DAILY_BUDGET if critical else DAILY_BUDGET - RESERVE
         return limit - self.state["calls"]
 
+    def _fail(self, path, msg, block=False):
+        """Records a provider failure. Kept in state.json across runs (provider_errors)
+        so the cause is always visible; auth/limit errors also open the circuit breaker."""
+        self.last_error = msg
+        stamp = datetime.datetime.now(TEHRAN).strftime("%m-%d %H:%M")
+        self.state.setdefault("provider_errors", {})[path] = f"{stamp} {msg[:300]}"
+        self.state.setdefault("errors", {})[path] = msg[:300]
+        if block:
+            # Key invalid/expired or limit reached: retrying every minute only burns quota.
+            self.state["blocked_until"] = int(time.time()) + 3600
+        print(f"  {path}: {msg[:200]}")
+
     def get(self, path, params=None, critical=False, validate=None, single_host=False):
+        now = int(time.time())
+        blocked = self.state.get("blocked_until", 0) > now
+        if blocked or self.remaining(critical) <= 0:
+            # One diagnostic call per hour is still allowed, so a fixed key (or the next
+            # day) is noticed quickly and the provider's message stays up to date.
+            if not critical or now - self.state.get("diag_at", 0) < 3600:
+                print(f"  skipping {path} ({'provider blocked' if blocked else 'daily budget used'})")
+                return None
+            self.state["diag_at"] = now
         params = dict(params or {})
         params["key"] = self.key
-        for host in HOSTS[:1] if single_host else HOSTS:
-            if self.remaining(critical) <= 0:
-                print(f"  budget exhausted, skipping {path}")
-                return None
-            url = f"{host}/{path}?{urllib.parse.urlencode(params)}"
-            self.state["calls"] += 1
-            try:
-                req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json"})
-                with urllib.request.urlopen(req, timeout=60) as r:
-                    data = json.loads(r.read().decode("utf-8"))
-            except Exception as e:
-                body = ""
-                if hasattr(e, "read"):
-                    try:
-                        body = e.read().decode("utf-8", "replace")[:200]
-                    except Exception:
-                        pass
-                self.last_error = f"{host}: {type(e).__name__} {getattr(e, 'code', '')} {body}".strip()
-                errs = self.state.setdefault("errors", {}); errs[path] = (errs.get(path, "") + " || " + self.last_error[:250]).strip(" |")
-                print(f"  {path} via {self.last_error}")
-                continue
-            if isinstance(data, dict) and (data.get("successful") is False or "code_http" in data):
-                self.last_error = f"{host}: API error {data.get('message_error') or data.get('status')}"
-                errs = self.state.setdefault("errors", {}); errs[path] = (errs.get(path, "") + " || " + self.last_error[:250]).strip(" |")
-                print(f"  {path} via {self.last_error}")
-                continue
-            if validate and not validate(data):
-                sample = json.dumps(data, ensure_ascii=False)[:400]
-                self.last_error = f"{host}: unexpected shape: {sample}"
-                errs = self.state.setdefault("errors", {}); errs[path] = (errs.get(path, "") + " || " + self.last_error).strip(" |")
-                print(f"  {path} via {self.last_error}")
-                continue
-            return data
-        return None
+        url = f"{HOSTS[0]}/{path}?{urllib.parse.urlencode(params)}"
+        self.state["calls"] += 1
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json"})
+            with urllib.request.urlopen(req, timeout=60) as r:
+                data = json.loads(r.read().decode("utf-8"))
+        except Exception as e:
+            body = ""
+            if hasattr(e, "read"):
+                try:
+                    body = e.read().decode("utf-8", "replace")[:300]
+                except Exception:
+                    pass
+            code = getattr(e, "code", None)
+            self._fail(path, f"{type(e).__name__} {code or ''} {body}".strip(), block=code in (401, 402, 403, 429))
+            return None
+        if isinstance(data, dict) and (data.get("successful") is False or "code_http" in data):
+            code = data.get("code_http")
+            msg = f"API error {code}: {data.get('message_error') or data.get('status')}"
+            self._fail(path, msg, block=code in (401, 402, 403, 429))
+            return None
+        if validate and not validate(data):
+            self._fail(path, "unexpected shape: " + json.dumps(data, ensure_ascii=False)[:300])
+            return None
+        self.state["blocked_until"] = 0
+        self.state["provider_ok_at"] = now
+        return data
 
 
 # ----------------------------------------------------------------- builders
