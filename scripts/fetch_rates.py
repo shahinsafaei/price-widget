@@ -752,6 +752,14 @@ def main():
         if gold_due:
             print("::warning::Gold_Currency failed/over budget — keeping previous gold/currency prices")
         gold = load(f"{dd}/latest.json", None) or load(f"{args.main_dir}/latest.json", None)
+    if gold_ok:
+        # Bug fix: the gold/currency response carries the provider's own 19-coin crypto
+        # list (no logos). Keep our top-100 list (with logos) between crypto refreshes,
+        # instead of letting every gold fetch overwrite it.
+        prev_latest = load(f"{dd}/latest.json", None) or {}
+        prev_crypto = prev_latest.get("cryptocurrency") or []
+        if len(prev_crypto) > len(gold.get("cryptocurrency") or []):
+            gold["cryptocurrency"] = prev_crypto
     crypto_ok = False
     if gold and due("crypto"):
         mark("crypto")
