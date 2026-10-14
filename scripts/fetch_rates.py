@@ -652,6 +652,12 @@ def main():
     if state.get("day") != today:
         state.update(day=today, calls=0)
     state.setdefault("backfilled", [])
+    # New API key → fresh start: the old key's usage counter and block state don't apply.
+    # (Only a short hash is stored, never the key itself — this file is public.)
+    key_id = hashlib.sha256(key.encode()).hexdigest()[:8]
+    if state.get("key_id") != key_id:
+        print(f"  new API key detected — resetting counter and circuit breaker")
+        state.update(key_id=key_id, calls=0, blocked_until=0, diag_at=0, provider_errors={})
     # Symbols whose history request failed today — not retried until tomorrow.
     # (Bug fix: they used to be retried every run, burning ~60 calls each time.)
     if state.get("failed_day") != today:
