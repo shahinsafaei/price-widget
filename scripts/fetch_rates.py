@@ -359,20 +359,36 @@ class Api:
         limit = DAILY_BUDGET if critical else DAILY_BUDGET - RESERVE
         return limit - self.state["calls"]
 
-    def _fail(self, path, msg, block=False):
-        """Records a provider failure. Kept in state.json across runs (provider_errors)
-        so the cause is always visible; auth/limit errors also open the circuit breaker."""
+    def _fail(self, path, msg, code=None):
+        """Records a provider failure (kept across runs in provider_errors) and opens the
+        right circuit breaker:
+          401/403 → the KEY is rejected: pause everything for an hour;
+          402     → this endpoint's own free daily allowance is used up: pause only
+                    this endpoint until tomorrow (e.g. History has a tiny free quota);
+          429     → rate limited: pause only this endpoint for an hour."""
         self.last_error = msg
         stamp = datetime.datetime.now(TEHRAN).strftime("%m-%d %H:%M")
         self.state.setdefault("provider_errors", {})[path] = f"{stamp} {msg[:300]}"
         self.state.setdefault("errors", {})[path] = msg[:300]
-        if block:
-            # Key invalid/expired or limit reached: retrying every minute only burns quota.
-            self.state["blocked_until"] = int(time.time()) + 3600
+        now = int(time.time())
+        if code in (401, 403):
+            self.state["blocked_until"] = now + 3600
+        elif code == 402:
+            tomorrow = datetime.datetime.combine(datetime.datetime.now(TEHRAN).date() + datetime.timedelta(days=1),
+                                                 datetime.time(0, 5), tzinfo=TEHRAN)
+            self.state.setdefault("blocked_paths", {})[path] = int(tomorrow.timestamp())
+        elif code == 429:
+            self.state.setdefault("blocked_paths", {})[path] = now + 3600
         print(f"  {path}: {msg[:200]}")
+
+    def path_blocked(self, path):
+        return self.state.get("blocked_paths", {}).get(path, 0) > int(time.time())
 
     def get(self, path, params=None, critical=False, validate=None, single_host=False):
         now = int(time.time())
+        if self.path_blocked(path):
+            print(f"  skipping {path} (its own quota is used up — retried later)")
+            return None
         blocked = self.state.get("blocked_until", 0) > now
         if blocked or self.remaining(critical) <= 0:
             # One diagnostic call per hour is still allowed, so a fixed key (or the next
@@ -397,12 +413,12 @@ class Api:
                 except Exception:
                     pass
             code = getattr(e, "code", None)
-            self._fail(path, f"{type(e).__name__} {code or ''} {body}".strip(), block=code in (401, 402, 403, 429))
+            self._fail(path, f"{type(e).__name__} {code or ''} {body}".strip(), code)
             return None
         if isinstance(data, dict) and (data.get("successful") is False or "code_http" in data):
             code = data.get("code_http")
             msg = f"API error {code}: {data.get('message_error') or data.get('status')}"
-            self._fail(path, msg, block=code in (401, 402, 403, 429))
+            self._fail(path, msg, code)
             return None
         if validate and not validate(data):
             self._fail(path, "unexpected shape: " + json.dumps(data, ensure_ascii=False)[:300])
@@ -652,12 +668,17 @@ def main():
     if state.get("day") != today:
         state.update(day=today, calls=0)
     state.setdefault("backfilled", [])
+    # One-time migration: before per-endpoint breakers, a single endpoint's quota error
+    # (e.g. History → 402) paused EVERYTHING via blocked_until. Clear that legacy block.
+    if "blocked_paths" not in state:
+        state["blocked_paths"] = {}
+        state["blocked_until"] = 0
     # New API key → fresh start: the old key's usage counter and block state don't apply.
     # (Only a short hash is stored, never the key itself — this file is public.)
     key_id = hashlib.sha256(key.encode()).hexdigest()[:8]
     if state.get("key_id") != key_id:
         print(f"  new API key detected — resetting counter and circuit breaker")
-        state.update(key_id=key_id, calls=0, blocked_until=0, diag_at=0, provider_errors={})
+        state.update(key_id=key_id, calls=0, blocked_until=0, blocked_paths={}, diag_at=0, provider_errors={})
     # Symbols whose history request failed today — not retried until tomorrow.
     # (Bug fix: they used to be retried every run, burning ~60 calls each time.)
     if state.get("failed_day") != today:
@@ -791,13 +812,15 @@ def main():
         todo = [s["l18"] for s in sorted(market["stocks"], key=lambda s: -(s.get("tval") or 0)) if s["l18"] not in done]
         started = time.time()
         for l18 in todo[:BACKFILL_PER_RUN]:
-            if api.remaining(False) <= 0 or state["bf_calls"] >= BACKFILL_DAILY_CAP or time.time() - started > 240:
+            if (api.remaining(False) <= 0 or state["bf_calls"] >= BACKFILL_DAILY_CAP or time.time() - started > 240
+                    or api.path_blocked("Tsetmc/History.php")):
                 break
             before = state["calls"]
             rows = api.get("Tsetmc/History.php", {"type": 0, "l18": l18}, single_host=True)
             state["bf_calls"] += state["calls"] - before
             if rows is None:
-                state["failed"].append(l18)
+                if not api.path_blocked("Tsetmc/History.php"):
+                    state["failed"].append(l18)
                 continue
             if isinstance(rows, dict):
                 rows = next((v for v in rows.values() if isinstance(v, list)), [])
