@@ -632,15 +632,58 @@ def merge_candle(series, day, o, h, l, c, v=None, overwrite=True):
     series.insert(0, row)
 
 
+def keep_last_good(gold, data_dir):
+    """On holidays the provider sends price 0 (time 00:00:00) for gold/currency.
+    Replace any zero/missing price with the last real one we saw, so users never
+    see 0. Last good items live in last_good.json; if a symbol has none yet, its
+    last non-zero close from the history is used."""
+    path = f"{data_dir}/last_good.json"
+    good = load(path, {})
+    daily = None
+    restored = 0
+    for k in ("gold", "currency"):
+        items = gold.get(k) or []
+        for i, x in enumerate(items):
+            if not isinstance(x, dict) or not x.get("symbol"):
+                continue
+            sym, p = x["symbol"], num(x.get("price"))
+            if p and p > 0:
+                good[sym] = x
+                continue
+            if sym in good:
+                items[i] = good[sym]
+                restored += 1
+                continue
+            if daily is None:
+                daily = load(f"{data_dir}/history/daily_core.json", {})
+            closes = [r for r in daily.get(sym, []) if len(r) >= 5 and r[4] and r[4] > 0]
+            if closes:
+                last = closes[-1]
+                y, m, d = (int(v) for v in last[0].split("-"))
+                jy, jm, jd = g2j(y, m, d)
+                items[i] = dict(x, price=last[4], change_percent=None, change_value=None,
+                                date="%d/%02d/%02d" % (jy, jm, jd), time=None)
+                good[sym] = items[i]
+                restored += 1
+    save(path, good)
+    if restored:
+        print(f"  kept last real price for {restored} items (provider sent 0)")
+
+
 def update_core_history(data_dir, items, now):
     intraday = load(f"{data_dir}/history/intraday.json", {})
     daily = load(f"{data_dir}/history/daily_core.json", {})
+    # Clean any zero prices recorded on holidays before this fix.
+    for k in list(intraday):
+        intraday[k] = [pt for pt in intraday[k] if pt[1] and pt[1] > 0]
+    for k in list(daily):
+        daily[k] = [r for r in daily[k] if len(r) >= 5 and r[4] and r[4] > 0]
     epoch = int(now.timestamp())
     cutoff = epoch - INTRADAY_HOURS * 3600
     today = now.strftime("%Y-%m-%d")
     for it in items:
         key, p = it.get("symbol"), num(it.get("price"))
-        if not key or p is None:
+        if not key or p is None or p <= 0:
             continue
         pts = [x for x in intraday.get(key, []) if x[0] >= cutoff]
         if not pts or pts[-1][1] != p:
@@ -752,6 +795,8 @@ def main():
         if gold_due:
             print("::warning::Gold_Currency failed/over budget — keeping previous gold/currency prices")
         gold = load(f"{dd}/latest.json", None) or load(f"{args.main_dir}/latest.json", None)
+    if gold:
+        keep_last_good(gold, dd)
     if gold_ok:
         # Bug fix: the gold/currency response carries the provider's own 19-coin crypto
         # list (no logos). Keep our top-100 list (with logos) between crypto refreshes,
